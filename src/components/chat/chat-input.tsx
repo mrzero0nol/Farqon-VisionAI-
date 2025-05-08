@@ -5,7 +5,7 @@ import { useState, type FC, type FormEvent, useEffect, useRef }
 from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Send, Loader2, Video, VideoOff, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
+import { Send, Loader2, Video, VideoOff, Mic, MicOff, Volume2, VolumeX, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ChatInputProps {
@@ -17,17 +17,19 @@ interface ChatInputProps {
   isTtsEnabled: boolean;
   onToggleTts: () => void;
   stopSpeaking: () => void;
+  onAnalyzeScene: () => void; // New prop for triggering scene analysis
 }
 
 const ChatInput: FC<ChatInputProps> = ({
   onSendMessage,
-  isLoading, // This now represents (isAiAnalyzing || isCameraProcessing) from parent
+  isLoading, 
   isCameraActive,
-  isCameraProcessing, // Keep this for the camera button's specific loader
+  isCameraProcessing, 
   onToggleCamera,
   isTtsEnabled,
   onToggleTts,
   stopSpeaking,
+  onAnalyzeScene,
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -120,14 +122,12 @@ const ChatInput: FC<ChatInputProps> = ({
     if (isRecording && speechRecognitionRef.current) {
       speechRecognitionRef.current.stop(); 
     }
-    if (inputValue.trim() && !isLoading) { // Use the combined isLoading prop
+    if (inputValue.trim() && !isLoading) { 
       onSendMessage(inputValue.trim());
       setInputValue('');
     }
   };
   
-  // General disable condition for most interactive elements.
-  // isLoading (isAiAnalyzing || isCameraProcessing) already covers camera processing.
   const commonDisabled = isLoading; 
 
   return (
@@ -151,10 +151,21 @@ const ChatInput: FC<ChatInputProps> = ({
         variant="outline"
         className="rounded-full border-white/30 bg-white/20 hover:bg-white/30 text-white"
         onClick={handleMicClick}
-        disabled={commonDisabled}
+        disabled={commonDisabled || isRecording} // Also disable if recording
         aria-label={isRecording ? "Hentikan perekaman" : "Mulai perekaman"}
       >
         {isRecording ? <MicOff className="h-5 w-5 text-destructive" /> : <Mic className="h-5 w-5" />}
+      </Button>
+       <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        className="rounded-full border-white/30 bg-white/20 hover:bg-white/30 text-white"
+        onClick={onAnalyzeScene}
+        disabled={commonDisabled || isRecording || !isCameraActive}
+        aria-label="Analisis pemandangan saat ini"
+      >
+        <Eye className="h-5 w-5" />
       </Button>
       <Button
         type="button"
@@ -162,10 +173,9 @@ const ChatInput: FC<ChatInputProps> = ({
         variant="outline"
         className="rounded-full border-white/30 bg-white/20 hover:bg-white/30 text-white"
         onClick={onToggleCamera}
-        disabled={isLoading || isRecording} // Camera toggle disabled if any loading OR recording
+        disabled={isLoading || isRecording} 
         aria-label={isCameraActive ? "Matikan kamera" : "Nyalakan kamera"}
       >
-        {/* Specific loader for camera hardware processing */}
         {isCameraProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : isCameraActive ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
       </Button>
        <Button
@@ -186,11 +196,10 @@ const ChatInput: FC<ChatInputProps> = ({
         type="submit"
         size="icon"
         className="rounded-full bg-accent hover:bg-accent/90 text-accent-foreground"
-        disabled={commonDisabled || !inputValue.trim()} 
+        disabled={commonDisabled || !inputValue.trim() || isRecording} 
         aria-label="Kirim pesan"
       >
-        {/* General loader if any AI analysis or camera processing is happening (but not specifically camera hardware) */}
-        {isLoading && !isCameraProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+        {isLoading && !isCameraProcessing && !isRecording ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
       </Button>
     </form>
   );

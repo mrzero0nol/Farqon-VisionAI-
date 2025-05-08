@@ -1,39 +1,57 @@
 
 'use client';
 
-import { useState, useRef, useEffect, type FC, useCallback } from 'react';
+import { useState, useRef, useEffect, type FC, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { Aperture, AlertCircle, VideoOff as VideoOffIconLucide } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import type { CameraFeedRefType } from '@/types';
 
 interface CameraFeedProps {
-  onFrameForAnalysis: (dataUri: string | null) => void; // Renamed for clarity
   isCameraActive: boolean; 
   onStarted?: () => void;
   onStopped?: () => void;
   onErrorOccurred?: (errorMessage: string) => void;
-  analysisIntervalMs?: number;
-  isAiAnalyzing: boolean;
 }
 
-const DEFAULT_ANALYSIS_INTERVAL = 7000; // Default 7 seconds
-
-const CameraFeed: FC<CameraFeedProps> = ({ 
-  onFrameForAnalysis,
+const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({ 
   isCameraActive,
   onStarted,
   onStopped,
   onErrorOccurred,
-  analysisIntervalMs = DEFAULT_ANALYSIS_INTERVAL,
-  isAiAnalyzing,
-}) => {
+}, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [internalStream, setInternalStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false); 
   const { toast } = useToast();
-  const analysisIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastCaptureTimeRef = useRef<number>(0);
+
+  useImperativeHandle(ref, () => ({
+    captureCurrentFrame: (): string | null => {
+      if (videoRef.current && internalStream && videoRef.current.readyState >= videoRef.current.HAVE_CURRENT_DATA) {
+        const videoElement = videoRef.current;
+        if (videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
+          console.warn("CameraFeed: Capture - video dimensions are zero. Skipping frame.");
+          return null;
+        }
+        console.log(`CameraFeed: Capturing frame on demand. Dimensions: ${videoElement.videoWidth}x${videoElement.videoHeight}`);
+        const canvas = document.createElement('canvas');
+        canvas.width = videoElement.videoWidth;
+        canvas.height = videoElement.videoHeight;
+        const context = canvas.getContext('2d');
+        if (context) {
+          context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+          const dataUri = canvas.toDataURL('image/jpeg', 0.85); // Quality for analysis
+          return dataUri;
+        } else {
+           console.error("CameraFeed: Capture - Could not get canvas context.");
+           return null;
+        }
+      }
+      console.log("CameraFeed: Capture - Camera not ready, stream not available, or video data not loaded.");
+      return null;
+    }
+  }), [internalStream]); // Dependency: internalStream ensures the function has the latest stream state.
 
   const stopCameraTracks = useCallback((streamToStop: MediaStream | null) => {
     if (streamToStop) {
@@ -45,41 +63,6 @@ const CameraFeed: FC<CameraFeedProps> = ({
     }
   }, []);
 
-  const captureAndSendFrameForAnalysis = useCallback(() => {
-    if (videoRef.current && internalStream && videoRef.current.readyState >= videoRef.current.HAVE_CURRENT_DATA && !isAiAnalyzing && isCameraActive) {
-      const now = Date.now();
-      // Debounce captures if analysis is quick or interval is very short
-      if (now - lastCaptureTimeRef.current < analysisIntervalMs / 2 && lastCaptureTimeRef.current !== 0) {
-          // console.log("CameraFeed: Skipping auto-capture, too soon.");
-          return;
-      }
-
-      const videoElement = videoRef.current;
-      if (videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
-        console.warn("CameraFeed: Auto-Capture - video dimensions are zero. Skipping frame.");
-        return;
-      }
-
-      console.log(`CameraFeed: Auto-capturing frame for analysis. Dimensions: ${videoElement.videoWidth}x${videoElement.videoHeight}`);
-      const canvas = document.createElement('canvas');
-      canvas.width = videoElement.videoWidth;
-      canvas.height = videoElement.videoHeight;
-      const context = canvas.getContext('2d');
-      if (context) {
-        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-        const dataUri = canvas.toDataURL('image/jpeg', 0.85); // Quality for analysis
-        onFrameForAnalysis(dataUri);
-        lastCaptureTimeRef.current = now;
-        console.log("CameraFeed: Auto-frame captured and sent for analysis.");
-      } else {
-         console.error("CameraFeed: Auto-Capture - Could not get canvas context.");
-      }
-    } else if (isAiAnalyzing) {
-        // console.log("CameraFeed: Skipping auto-capture, AI is analyzing.");
-    }
-  }, [internalStream, isAiAnalyzing, analysisIntervalMs, onFrameForAnalysis, isCameraActive]);
-
-
   useEffect(() => {
     let currentStream: MediaStream | null = null; 
 
@@ -87,7 +70,6 @@ const CameraFeed: FC<CameraFeedProps> = ({
       console.log("CameraFeed: Attempting to start camera.");
       setError(null);
       setIsLoading(true);
-      lastCaptureTimeRef.current = 0; // Reset last capture time
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -127,11 +109,6 @@ const CameraFeed: FC<CameraFeedProps> = ({
 
     const stopCamera = () => {
       console.log("CameraFeed: Attempting to stop camera. Current internalStream:", internalStream?.id);
-      if (analysisIntervalRef.current) {
-        clearInterval(analysisIntervalRef.current);
-        analysisIntervalRef.current = null;
-        console.log("CameraFeed: Auto-analysis interval cleared due to camera stop.");
-      }
       if (internalStream) {
         stopCameraTracks(internalStream);
         setInternalStream(null);
@@ -143,7 +120,6 @@ const CameraFeed: FC<CameraFeedProps> = ({
         console.log("CameraFeed: videoRef.srcObject set to null, paused, and loaded.");
       }
       setIsLoading(false); 
-      lastCaptureTimeRef.current = 0;
       if (onStopped) onStopped();
     };
 
@@ -151,54 +127,29 @@ const CameraFeed: FC<CameraFeedProps> = ({
       if (!internalStream) { 
         startCamera();
       } else {
+        // If camera is already active and stream exists (e.g. due to HMR or prop change without toggling)
+        // Ensure onStarted is called if it wasn't (though typically this path means it was).
         if (onStarted) onStarted(); 
       }
     } else {
       if (internalStream) { 
         stopCamera();
       } else {
+         // If camera is inactive and no stream, ensure onStopped is called.
          if (onStopped) onStopped(); 
       }
     }
 
     return () => {
       console.log("CameraFeed: useEffect cleanup. Stopping currentStream:", currentStream?.id);
-      if (analysisIntervalRef.current) {
-        clearInterval(analysisIntervalRef.current);
-        analysisIntervalRef.current = null;
-      }
       stopCameraTracks(currentStream); 
-      if (videoRef.current) {
+      // Ensure video srcObject is cleared on unmount if stream was active
+      if (videoRef.current && videoRef.current.srcObject === currentStream && currentStream !== null) {
         videoRef.current.srcObject = null;
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCameraActive]); // Removed other deps to control flow strictly by isCameraActive
-
-
-  useEffect(() => {
-    if (isCameraActive && internalStream && !isAiAnalyzing) {
-      if (!analysisIntervalRef.current) {
-        console.log(`CameraFeed: Starting auto-analysis interval (${analysisIntervalMs}ms).`);
-        // Initial capture attempt shortly after camera starts and AI is not busy
-        setTimeout(() => captureAndSendFrameForAnalysis(), 500); 
-        analysisIntervalRef.current = setInterval(captureAndSendFrameForAnalysis, analysisIntervalMs);
-      }
-    } else {
-      if (analysisIntervalRef.current) {
-        console.log("CameraFeed: Clearing auto-analysis interval (camera inactive, stream lost, or AI busy).");
-        clearInterval(analysisIntervalRef.current);
-        analysisIntervalRef.current = null;
-      }
-    }
-    // Cleanup for this effect instance
-    return () => {
-      if (analysisIntervalRef.current) {
-        clearInterval(analysisIntervalRef.current);
-        analysisIntervalRef.current = null;
-      }
-    };
-  }, [isCameraActive, internalStream, captureAndSendFrameForAnalysis, analysisIntervalMs, isAiAnalyzing]);
+  }, [isCameraActive]); // Control flow strictly by isCameraActive
 
 
   return (
@@ -238,10 +189,9 @@ const CameraFeed: FC<CameraFeedProps> = ({
             </Alert>
         </div>
       )}
-
-      {/* Manual capture button removed for automatic analysis */}
     </div>
   );
-};
+});
 
+CameraFeed.displayName = 'CameraFeed';
 export default CameraFeed;

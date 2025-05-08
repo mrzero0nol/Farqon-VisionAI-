@@ -5,16 +5,13 @@ import { useState, useRef, useEffect, type FC, useCallback } from 'react';
 import ChatMessage from './chat-message';
 import ChatInput from './chat-input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import type { ChatMessageData } from '@/types';
+import type { ChatMessageData, CameraFeedRefType } from '@/types';
 import { contextualChatWithVision, analyzeCameraFeed } from '@/ai/flows';
 import { useToast } from '@/hooks/use-toast';
-// import { MessageSquareDashed } from 'lucide-react'; // No longer used
-// import { cn } from '@/lib/utils'; // No longer used
 
 interface ChatPanelProps {
-  autoCapturedFrame: string | null; 
+  cameraFeedRef: React.RefObject<CameraFeedRefType>;
   isCameraActive: boolean;
-  clearAutoCapturedFrame: () => void;
   isCameraProcessing: boolean; // Hardware camera processing
   onToggleCamera: () => void;
   isAiAnalyzing: boolean; // AI model processing
@@ -22,9 +19,8 @@ interface ChatPanelProps {
 }
 
 const ChatPanel: FC<ChatPanelProps> = ({
-  autoCapturedFrame,
+  cameraFeedRef,
   isCameraActive,
-  clearAutoCapturedFrame,
   isCameraProcessing,
   onToggleCamera,
   isAiAnalyzing,
@@ -88,65 +84,70 @@ const ChatPanel: FC<ChatPanelProps> = ({
     }
   }, [messages]);
 
-
-  const handleAnalyzeAutoFrame = useCallback(async (imageDataUri: string) => {
-    if (isAiAnalyzing) {
-      console.log("ChatPanel: Analysis already in progress. Skipping new auto-frame.");
-      clearAutoCapturedFrame(); // Clear it to prevent re-processing if AI becomes free quickly
-      return;
-    }
+  const handleAnalyzeScene = useCallback(async (imageDataUri: string) => {
+    // This function is now only called after a manual trigger and successful frame capture
     setIsAiAnalyzing(true);
     stopSpeaking();
 
     try {
-      console.log("ChatPanel: Sending auto-frame for AI analysis.");
+      console.log("ChatPanel: Sending frame for AI analysis.");
       const response = await analyzeCameraFeed({ photoDataUri: imageDataUri });
-      // Add AI's analysis to chat, associating the image with the AI's response.
-      // This makes the image available for subsequent questions.
       addMessage({ 
-        id: Date.now().toString() + '-auto', 
+        id: Date.now().toString() + '-manual-analysis', 
         role: 'assistant', 
         content: response.summary, 
-        image: imageDataUri // Associate image with AI's summary
+        image: imageDataUri 
       });
       if (response.summary) speakText(response.summary);
     } catch (error) {
-      console.error("Error auto-analyzing camera feed:", error);
+      console.error("Error analyzing camera feed:", error);
       const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui.";
-      // Optionally add a silent error message or log, avoid spamming toasts for auto-analysis
-      addMessage({ id: Date.now().toString() + '-auto-err', role: 'assistant', content: `Maaf, terjadi kesalahan saat menganalisis secara otomatis: ${errorMessage.substring(0,100)}...`, isError: true });
-      // speakText(`Analisis otomatis gagal.`); // Avoid speaking errors frequently
+      addMessage({ id: Date.now().toString() + '-manual-err', role: 'assistant', content: `Maaf, terjadi kesalahan saat menganalisis pemandangan: ${errorMessage.substring(0,100)}...`, isError: true });
+      speakText(`Analisis pemandangan gagal.`);
+      toast({
+        title: "Kesalahan Analisis",
+        description: `Gagal menganalisis pemandangan. ${errorMessage}`,
+        variant: "destructive",
+      });
     } finally {
       setIsAiAnalyzing(false);
-      clearAutoCapturedFrame(); // Ensure frame is cleared after attempt
     }
-  }, [addMessage, speakText, stopSpeaking, setIsAiAnalyzing, isAiAnalyzing, clearAutoCapturedFrame, analyzeCameraFeed]);
-  
-  useEffect(() => {
-    if (autoCapturedFrame && isCameraActive && !isCameraProcessing) { 
-      handleAnalyzeAutoFrame(autoCapturedFrame);
-      // autoCapturedFrame is cleared within handleAnalyzeAutoFrame or its finally block
-    } else if (autoCapturedFrame && (!isCameraActive || isCameraProcessing)) {
-        // If camera becomes inactive or is processing, clear stale frame
-        clearAutoCapturedFrame();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoCapturedFrame, isCameraActive, isCameraProcessing]); // handleAnalyzeAutoFrame is memoized
+  }, [addMessage, speakText, stopSpeaking, setIsAiAnalyzing, toast]);
 
+  const triggerManualSceneAnalysis = useCallback(async () => {
+    if (isAiAnalyzing) {
+      toast({ title: "Analisis Sedang Berjalan", description: "Harap tunggu analisis saat ini selesai.", variant: "default" });
+      return;
+    }
+    if (!isCameraActive || !cameraFeedRef.current) {
+      toast({ title: "Kamera Tidak Aktif", description: "Aktifkan kamera terlebih dahulu untuk menganalisis pemandangan.", variant: "destructive" });
+      return;
+    }
+
+    console.log("ChatPanel: Attempting to capture frame manually.");
+    const imageDataUri = cameraFeedRef.current.captureCurrentFrame();
+
+    if (imageDataUri) {
+      console.log("ChatPanel: Manual frame captured successfully.");
+      await handleAnalyzeScene(imageDataUri);
+    } else {
+      console.warn("ChatPanel: Failed to capture frame manually.");
+      toast({ title: "Gagal Menangkap Gambar", description: "Tidak dapat menangkap gambar dari kamera. Pastikan kamera berfungsi.", variant: "destructive" });
+    }
+  }, [isAiAnalyzing, isCameraActive, cameraFeedRef, handleAnalyzeScene, toast]);
+  
 
   const handleSendMessage = useCallback(async (userQuestion: string) => {
     stopSpeaking();
     
     const userMessageId = Date.now().toString();
-    // Find the latest image from message history to use as context.
-    // This image could be from a user's previous message OR from an AI's auto-analysis response.
     let imageToUseForQuestion: string | undefined = messages.slice().reverse().find(msg => msg.image)?.image;
   
     addMessage({ id: userMessageId, role: 'user', content: userQuestion, image: imageToUseForQuestion });
     setIsAiAnalyzing(true); 
   
     if (!imageToUseForQuestion) {
-      const aiErrorMsg = "Saat ini tidak ada gambar untuk dijadikan konteks pertanyaan Anda. Jika kamera aktif, tunggu analisis otomatis. Jika tidak, silakan aktifkan kamera.";
+      const aiErrorMsg = "Saat ini tidak ada gambar untuk dijadikan konteks pertanyaan Anda. Silakan analisis pemandangan terlebih dahulu menggunakan tombol 'Analisis Pemandangan'.";
       addMessage({ id: Date.now().toString() + '-ai-no-ctx', role: 'assistant', content: aiErrorMsg, isError: true });
       speakText(aiErrorMsg);
       toast({
@@ -158,7 +159,6 @@ const ChatPanel: FC<ChatPanelProps> = ({
       return;
     }
     
-    // We have an image context.
     try {
       console.log("ChatPanel: Sending user question with image context to AI.");
       const response = await contextualChatWithVision({ photoDataUri: imageToUseForQuestion, question: userQuestion });
@@ -179,7 +179,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
       setIsAiAnalyzing(false);
     }
   
-  }, [addMessage, speakText, stopSpeaking, toast, messages, setIsAiAnalyzing, contextualChatWithVision]);
+  }, [addMessage, speakText, stopSpeaking, toast, messages, setIsAiAnalyzing]);
 
   const toggleTts = () => {
     setIsTtsEnabled(prev => {
@@ -197,13 +197,14 @@ const ChatPanel: FC<ChatPanelProps> = ({
       </ScrollArea>
       <ChatInput
         onSendMessage={handleSendMessage}
-        isLoading={isAiAnalyzing || isCameraProcessing} // Combined loading state for input
+        isLoading={isAiAnalyzing || isCameraProcessing} 
         isCameraActive={isCameraActive}
         isCameraProcessing={isCameraProcessing}
         onToggleCamera={onToggleCamera}
         isTtsEnabled={isTtsEnabled}
         onToggleTts={toggleTts}
         stopSpeaking={stopSpeaking}
+        onAnalyzeScene={triggerManualSceneAnalysis} 
       />
     </div>
   );

@@ -6,3 +6,7 @@ export interface ChatMessageData {
   image?: string; // Optional: dataURI of an image associated with the message
   isError?: boolean; // Optional: flag for error messages
 }
+
+export interface CameraFeedRefType {
+  captureCurrentFrame: () => string | null;
+}
