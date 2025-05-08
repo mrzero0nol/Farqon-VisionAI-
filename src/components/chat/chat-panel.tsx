@@ -17,11 +17,19 @@ interface ChatPanelProps {
   capturedFrame: string | null; 
   isCameraActive: boolean;
   clearCapturedFrame: () => void;
+  isCameraProcessing: boolean;
+  onToggleCamera: () => void;
 }
 
-const ChatPanel: FC<ChatPanelProps> = ({ capturedFrame, isCameraActive, clearCapturedFrame }) => {
+const ChatPanel: FC<ChatPanelProps> = ({ 
+  capturedFrame, 
+  isCameraActive, 
+  clearCapturedFrame,
+  isCameraProcessing,
+  onToggleCamera
+ }) => {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // For AI message loading
   const [isChatOpen, setIsChatOpen] = useState(true);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const chatContentRef = useRef<HTMLDivElement>(null);
@@ -33,7 +41,6 @@ const ChatPanel: FC<ChatPanelProps> = ({ capturedFrame, isCameraActive, clearCap
 
   useEffect(() => {
     if (isChatOpen && chatContentRef.current) {
-        // Wait for next tick to allow DOM update for scroll height
         setTimeout(() => {
             if(chatContentRef.current) {
                  chatContentRef.current.scrollTop = chatContentRef.current.scrollHeight;
@@ -45,14 +52,10 @@ const ChatPanel: FC<ChatPanelProps> = ({ capturedFrame, isCameraActive, clearCap
   useEffect(() => {
     if (capturedFrame && isCameraActive) {
       handleAnalyzeFrame(capturedFrame);
-      // Automatically open chat if it's closed and a new frame is analyzed
-      if (!isChatOpen) {
-        // setIsChatOpen(true); // User might prefer manual opening
-      }
       clearCapturedFrame(); 
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capturedFrame, isCameraActive, clearCapturedFrame]); // Added clearCapturedFrame
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capturedFrame, isCameraActive]); // Removed clearCapturedFrame from deps as it's stable
 
   const handleAnalyzeFrame = async (imageDataUri: string) => {
     setIsLoading(true);
@@ -82,7 +85,7 @@ const ChatPanel: FC<ChatPanelProps> = ({ capturedFrame, isCameraActive, clearCap
         variant: "destructive"
       });
       addMessage({ id: Date.now().toString() + '-user-error', role: 'user', content: userQuestion });
-      addMessage({ id: Date.now().toString() + '-ai-error', role: 'assistant', content: "I need an image to 'see'. Please capture a frame from the camera first.", isError: true });
+      addMessage({ id: Date.now().toString() + '-ai-error', role: 'assistant', content: "I need an image to 'see'. Please activate the camera and capture a frame first.", isError: true });
       return;
     }
 
@@ -96,13 +99,13 @@ const ChatPanel: FC<ChatPanelProps> = ({ capturedFrame, isCameraActive, clearCap
          toast({
             title: "No Image for Question",
             description: "Please capture a frame to ask about specific visual content.",
-            variant: "destructive"
+            variant: "warning" // Changed to warning as it's not a critical error
         });
         setIsLoading(false);
         return;
     }
     
-    if (!imageToSend && !isCameraActive) {
+    if (!imageToSend && !isCameraActive) { // This implies camera is off and no frame ever captured or relevant
        addMessage({id: Date.now().toString() + '-critical-no-img', role: 'assistant', content: "I can't see anything right now. Please start the camera and capture an image.", isError: true});
        setIsLoading(false);
        return;
@@ -125,7 +128,8 @@ const ChatPanel: FC<ChatPanelProps> = ({ capturedFrame, isCameraActive, clearCap
         setIsLoading(false);
       }
     } else {
-      addMessage({ id: Date.now().toString() + '-fallback-no-img', role: 'assistant', content: "I don't have an image to reference for your question.", isError: true });
+      // This case should ideally be covered by the checks above.
+      addMessage({ id: Date.now().toString() + '-fallback-no-img', role: 'assistant', content: "I don't have an image to reference for your question. Please capture a frame.", isError: true });
       setIsLoading(false);
     }
   };
@@ -133,7 +137,7 @@ const ChatPanel: FC<ChatPanelProps> = ({ capturedFrame, isCameraActive, clearCap
   return (
     <Card className={cn(
       "w-full shadow-xl rounded-t-xl overflow-hidden bg-card/90 backdrop-blur-md transition-all duration-300 ease-in-out",
-      isChatOpen ? 'max-h-[75vh] sm:max-h-[65vh]' : 'max-h-[72px] sm:max-h-[80px]' // Adjusted height for collapsed state
+      isChatOpen ? 'max-h-[75vh] sm:max-h-[65vh]' : 'max-h-[72px] sm:max-h-[80px]'
     )}>
       <CardHeader 
         className="flex flex-row items-center justify-between p-3 sm:p-4 cursor-pointer select-none" 
@@ -171,7 +175,13 @@ const ChatPanel: FC<ChatPanelProps> = ({ capturedFrame, isCameraActive, clearCap
                 )}
              </div>
           </ScrollArea>
-          <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+          <ChatInput 
+            onSendMessage={handleSendMessage} 
+            isLoading={isLoading} 
+            isCameraActive={isCameraActive}
+            isCameraProcessing={isCameraProcessing}
+            onToggleCamera={onToggleCamera}
+          />
       </div>
     </Card>
   );
