@@ -26,6 +26,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
   const [isLoading, setIsLoading] = useState<boolean>(false); 
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const { toast } = useToast();
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean>(false);
 
   useImperativeHandle(ref, () => ({
     captureCurrentFrame: (): string | null => {
@@ -72,19 +73,34 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
 
     setFacingMode(prevMode => {
       const newMode = prevMode === 'user' ? 'environment' : 'user';
-      if (!isCameraActive) {
-        // If camera is off, just update the mode for the next time it's started.
-        console.log(`CameraFeed: FacingMode set to ${newMode} (camera is off, will use this when next started)`);
-      } else {
-        // If camera is active, we are initiating a switch. Set loading.
-        // The useEffect will handle the actual stream stopping and starting.
-        console.log(`CameraFeed: Initiating facing mode toggle to ${newMode}. useEffect will handle restart.`);
-        setIsLoading(true); 
-      }
+      console.log(`CameraFeed: Initiating facing mode toggle to ${newMode}.`);
+      setIsLoading(true);
       return newMode;
     });
-  }, [isCameraActive, isLoading, setIsLoading, setFacingMode]);
+  }, [isLoading]);
 
+  useEffect(() => {
+      const getCameraPermission = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({video: true});
+          setHasCameraPermission(true);
+
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (error) {
+          console.error('Error accessing camera:', error);
+          setHasCameraPermission(false);
+          toast({
+            variant: 'destructive',
+            title: 'Camera Access Denied',
+            description: 'Please enable camera permissions in your browser settings to use this app.',
+          });
+        }
+      };
+
+      getCameraPermission();
+    }, []);
 
   useEffect(() => {
     // This ref holds the stream created in *this specific run* of the useEffect.
@@ -189,7 +205,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
       if (onStopped) onStopped();
     };
 
-    if (isCameraActive) {
+    if (isCameraActive && hasCameraPermission) {
       // If camera should be active, we need to ensure it's running with the current facingMode.
       // This will also handle re-starting if facingMode changed.
       console.log("CameraFeed: useEffect - Camera active, proceeding to start/ensure camera with current settings.");
@@ -222,7 +238,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
       setInternalStream(current => current === effectInstanceStream ? null : current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps 
-  }, [isCameraActive, facingMode]); // Rerun effect if isCameraActive or facingMode changes.
+  }, [isCameraActive, facingMode, hasCameraPermission]); // Rerun effect if isCameraActive or facingMode changes.
 
   return (
     <div className="w-full h-full relative bg-black">
@@ -231,13 +247,13 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
         autoPlay 
         playsInline 
         muted 
-        className={`w-full h-full object-cover ${isCameraActive && internalStream && !isLoading ? 'block' : 'hidden'}`}
+        className={`w-full h-full object-cover ${isCameraActive && internalStream && !isLoading && hasCameraPermission ? 'block' : 'hidden'}`}
         onLoadedData={() => console.log("CameraFeed: Video data loaded.")}
         onCanPlay={() => console.log("CameraFeed: Video can play.")}
         onError={(e) => console.error("CameraFeed: Video element error:", e)}
       />
-      
-      {isCameraActive && !isLoading && ( // Show switch button if camera is supposed to be active and not loading
+
+	{hasCameraPermission && isCameraActive && !isLoading && ( // Show switch button if camera is supposed to be active and not loading
         <Button
           onClick={handleToggleFacingMode}
           variant="outline"
@@ -273,6 +289,15 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
             </Alert>
         </div>
       )}
+	{ !(hasCameraPermission) && (
+            <Alert variant="destructive">
+              <AlertTitle>Camera Access Required</AlertTitle>
+              <AlertDescription>
+                Please allow camera access to use this feature.
+              </AlertDescription>
+            </Alert>
+          )
+        }
     </div>
   );
 });
