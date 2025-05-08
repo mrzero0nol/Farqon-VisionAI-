@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import CameraFeed from '@/components/chat/camera-feed';
 import ChatPanel from '@/components/chat/chat-panel';
 import { useToast } from '@/hooks/use-toast';
@@ -11,53 +12,44 @@ export default function VisionAIChatPage() {
   const [isCameraProcessing, setIsCameraProcessing] = useState<boolean>(false);
   const { toast } = useToast();
 
+  useEffect(() => {
+    console.log(`Page: isCameraActive changed to: ${isCameraActive}, isCameraProcessing: ${isCameraProcessing}`);
+  }, [isCameraActive, isCameraProcessing]);
+
   const handleFrameCapture = useCallback((dataUri: string) => {
+    console.log("Page: Frame captured");
     setCapturedFrame(dataUri);
   }, []);
 
   const clearCapturedFrame = useCallback(() => {
+    console.log("Page: Clearing captured frame");
     setCapturedFrame(null);
   }, []);
 
   const handleToggleCamera = useCallback(() => {
-    setIsCameraProcessing(true);
-    setIsCameraActive(prev => !prev);
-  }, []);
+    console.log("Page: Toggle camera clicked. Current state: isCameraActive =", isCameraActive);
+    setIsCameraProcessing(true); // Indicate processing will start
+    setIsCameraActive(prev => !prev); // This triggers CameraFeed to react
+  }, []); // setIsCameraProcessing and setIsCameraActive are stable
 
   const handleCameraStarted = useCallback(() => {
+    console.log("Page: CameraFeed reported camera started.");
     setIsCameraProcessing(false);
-    // If isCameraActive is false here, it means it was toggled off rapidly after being toggled on.
-    // The CameraFeed component will only call onStarted if it successfully started.
-    if (!isCameraActive) {
-        // This case should ideally not happen if logic is tight, but as a safeguard:
-        // setIsCameraActive(true); // Ensure UI consistency if camera started despite a quick toggle off.
-    }
-  }, [isCameraActive]);
+    // isCameraActive should be true at this point, set by handleToggleCamera
+  }, []); // setIsCameraProcessing is stable
 
   const handleCameraStopped = useCallback(() => {
+    console.log("Page: CameraFeed reported camera stopped.");
     setIsCameraProcessing(false);
-     // Similar to handleCameraStarted, ensure consistency.
-    if (isCameraActive) {
-       // setIsCameraActive(false); // Safeguard
-    }
-  }, [isCameraActive]);
+    // isCameraActive should be false at this point, set by handleToggleCamera or error
+  }, []); // setIsCameraProcessing is stable
 
   const handleCameraError = useCallback((errorMessage: string) => {
+    console.log(`Page: CameraFeed reported error: ${errorMessage}`);
     setIsCameraProcessing(false);
-    // If camera was intended to be active, but failed, turn it off.
-    // The local isCameraActive state will be checked against the state when this callback was created.
-    // If isCameraActive was true when this was created, and an error occurs, setIsCameraActive(false) is called.
-    // This should correctly reflect the camera's off state.
-    if (isCameraActive) { 
-        setIsCameraActive(false);
-    }
-    // Toast is already shown by CameraFeed, but can add more specific ones here if needed.
-    // toast({
-    //   title: "Camera Operation Failed",
-    //   description: errorMessage,
-    //   variant: "destructive",
-    // });
-  }, [isCameraActive, toast]);
+    setIsCameraActive(false); // Ensure camera is marked as inactive on error
+    // Toast is already shown by CameraFeed
+  }, []); // setIsCameraProcessing and setIsCameraActive are stable
 
 
   return (
@@ -95,3 +87,4 @@ export default function VisionAIChatPage() {
     </div>
   );
 }
+
