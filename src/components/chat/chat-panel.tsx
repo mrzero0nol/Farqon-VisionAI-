@@ -49,7 +49,9 @@ const ChatPanel: FC<ChatPanelProps> = ({
   const speakText = useCallback((text: string) => {
     if (typeof window !== 'undefined' && window.speechSynthesis && text && isTtsEnabled) {
       window.speechSynthesis.cancel(); 
-      const utterance = new SpeechSynthesisUtterance(text);
+      // Remove asterisks from the text before sending to TTS
+      const cleanedText = text.replace(/\*/g, ''); 
+      const utterance = new SpeechSynthesisUtterance(cleanedText);
       const voices = window.speechSynthesis.getVoices();
       const indonesianVoice = voices.find(voice => voice.lang === 'id-ID' || voice.lang.startsWith('id-'));
       if (indonesianVoice) {
@@ -176,3 +178,4 @@ const ChatPanel: FC<ChatPanelProps> = ({
 };
 
 export default ChatPanel;
+
