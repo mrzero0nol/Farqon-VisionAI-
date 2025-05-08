@@ -98,9 +98,7 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  /* Removed global border: * { @apply border-border; } */
   body {
     @apply bg-background text-foreground;
   }
