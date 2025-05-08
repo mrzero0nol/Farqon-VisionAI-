@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useEffect, type FC, useCallback } from 'react';
@@ -69,6 +70,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
       window.speechSynthesis.onvoiceschanged = loadVoices;
       return () => {
         window.speechSynthesis.onvoiceschanged = null;
+        window.speechSynthesis.cancel(); // Ensure any ongoing speech is stopped on unmount
       };
     }
   }, []);
@@ -87,7 +89,8 @@ const ChatPanel: FC<ChatPanelProps> = ({
   const handleAnalyzeFrame = useCallback(async (imageDataUri: string) => {
     setIsLoading(true);
     stopSpeaking();
-    addMessage({ id: Date.now().toString() + 'img-prompt', role: 'user', content: 'Apa yang Anda lihat di gambar ini?', image: imageDataUri });
+    // The user message "Apa yang Anda lihat..." helps contextualize the AI's analysis in the chat log.
+    addMessage({ id: Date.now().toString() + 'img-prompt', role: 'user', content: 'Analisis gambar ini.', image: imageDataUri });
     try {
       const response = await analyzeCameraFeed({ photoDataUri: imageDataUri });
       addMessage({ id: Date.now().toString(), role: 'assistant', content: response.summary });
@@ -95,7 +98,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
     } catch (error) {
       console.error("Error analyzing camera feed:", error);
       const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui.";
-      const aiErrorMsg = `Maaf, saya mengalami kesalahan: ${errorMessage}`;
+      const aiErrorMsg = `Maaf, saya mengalami kesalahan saat menganalisis gambar: ${errorMessage}`;
       addMessage({ id: Date.now().toString(), role: 'assistant', content: aiErrorMsg, isError: true });
       speakText(aiErrorMsg);
       toast({
@@ -109,84 +112,99 @@ const ChatPanel: FC<ChatPanelProps> = ({
   }, [addMessage, speakText, stopSpeaking, toast]);
   
   useEffect(() => {
-    // Trigger analysis only when capturedFrame is newly set and valid.
-    // isCameraActive check removed from here, as frame capture itself implies camera was active.
-    // Analysis should proceed even if camera is toggled off right after capture.
     if (capturedFrame) { 
       handleAnalyzeFrame(capturedFrame);
-      clearCapturedFrame(); // Clear it after initiating analysis to prevent re-analysis on re-renders.
+      clearCapturedFrame(); 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capturedFrame, handleAnalyzeFrame, clearCapturedFrame]); // Only react to capturedFrame changes
+  }, [capturedFrame, clearCapturedFrame]); // handleAnalyzeFrame removed from deps as its deps are stable or themselves memoized. This prevents re-analysis if, e.g., isTtsEnabled changes.
 
 
   const handleSendMessage = useCallback(async (userQuestion: string) => {
     stopSpeaking();
     
-    // Use the `capturedFrame` state variable, which holds the last captured frame.
-    // It's cleared by `handleAnalyzeFrame` after initiating analysis.
-    // If a question is asked immediately after auto-analysis, `capturedFrame` might be null here.
-    // This logic assumes a question relates to the *last visual context*, which is the analyzed frame.
-    // If no frame has been captured and analyzed recently, it will prompt to start camera.
-    
-    // Determine if there's *any* visual context.
-    // This depends on how `capturedFrame` is managed by the parent and when `handleAnalyzeFrame` clears it.
-    // Let's assume if a message has an image, that's our context.
-    const lastMessageWithImage = messages.slice().reverse().find(msg => msg.image);
-    const imageContextForQuestion = lastMessageWithImage?.image;
-
-    if (!isCameraActive && !imageContextForQuestion) {
+    const userMessageId = Date.now().toString();
+    // Find the latest image from message history to use as context
+    let imageToUseForQuestion: string | undefined = messages.slice().reverse().find(msg => msg.image)?.image;
+  
+    // Add user message optimistically. It will be updated with an image if one is used.
+    addMessage({ id: userMessageId, role: 'user', content: userQuestion });
+    setIsLoading(true);
+  
+    if (!isCameraActive && !imageToUseForQuestion) {
+      // Case 1: Camera is OFF, and NO image context from previous messages.
+      const aiErrorMsg = "Kamera tidak aktif dan tidak ada gambar sebelumnya untuk konteks. Aktifkan kamera dan tangkap frame jika pertanyaan Anda terkait visual.";
+      addMessage({ id: Date.now().toString() + '-ai-no-cam-no-ctx', role: 'assistant', content: aiErrorMsg, isError: true });
+      speakText(aiErrorMsg);
       toast({
-        title: "Tidak Ada Konteks Gambar",
-        description: "Silakan mulai kamera dan tangkap frame untuk bertanya tentangnya.",
+        title: "Tidak Ada Konteks Visual",
+        description: "Aktifkan kamera dan tangkap frame untuk pertanyaan visual.",
         variant: "destructive"
       });
-      addMessage({ id: Date.now().toString() + '-user-error', role: 'user', content: userQuestion });
-      const aiErrorMsg = "Saya membutuhkan gambar untuk 'melihat'. Harap aktifkan kamera dan tangkap frame terlebih dahulu.";
-      addMessage({ id: Date.now().toString() + '-ai-error', role: 'assistant', content: aiErrorMsg, isError: true });
-      speakText(aiErrorMsg);
+      setIsLoading(false);
+      // Optionally, remove the user's unanswerable question:
+      // setMessages(prev => prev.filter(m => m.id !== userMessageId)); 
+      return;
+    }
+  
+    if (isCameraActive && !imageToUseForQuestion) {
+      // Case 2: Camera is ON, but NO image context from previous messages.
+      // This means the user likely wants to ask about the CURRENT live feed but hasn't captured a frame yet.
+      const aiGuidanceMsg = "Kamera aktif. Untuk bertanya tentang apa yang Anda lihat sekarang, silakan tekan tombol rana (ikon Aperture di bawah video) untuk menangkap gambar terlebih dahulu. Setelah itu, saya bisa menjawab pertanyaan Anda tentang gambar tersebut.";
+      addMessage({ id: Date.now().toString() + '-ai-prompt-capture', role: 'assistant', content: aiGuidanceMsg, isError: false }); // Guidance, not an error
+      speakText(aiGuidanceMsg);
+      toast({
+        title: "Perlu Menangkap Gambar",
+        description: "Tekan tombol rana (Aperture) untuk menangkap pemandangan saat ini.",
+        variant: "info"
+      });
+      setIsLoading(false);
+      // The user's question remains, and AI provides guidance.
       return;
     }
     
-    addMessage({ id: Date.now().toString(), role: 'user', content: userQuestion, image: imageContextForQuestion ? imageContextForQuestion : undefined });
-    setIsLoading(true);
-
-    if (!imageContextForQuestion) {
-        // This case means camera might be active, but no frame was explicitly captured *for this question*
-        // or the auto-analyzed frame is not considered the direct context for this specific question.
-        // The AI should be informed.
-        const aiMsg = "Saya tidak memiliki gambar spesifik untuk pertanyaan ini. Jika Anda ingin saya melihat sesuatu yang baru, harap tangkap frame. Saya akan mencoba menjawab berdasarkan pengetahuan umum atau konteks visual sebelumnya jika ada.";
-        addMessage({ id: Date.now().toString() + '-no-img', role: 'assistant', content: aiMsg });
-        speakText(aiMsg);
+    // Case 3: We have an image context (imageToUseForQuestion is not undefined).
+    // This image could be from a previous auto-analysis or a previous question.
+    // This path is taken if:
+    //   a) Camera is OFF, but there's historical image context.
+    //   b) Camera is ON, and there's historical image context (user is continuing conversation about an older frame).
+    if (imageToUseForQuestion) {
+      // Update the user's message to formally associate it with the image being used for context.
+      setMessages(prevMessages => prevMessages.map(m => {
+        if (m.id === userMessageId) {
+          return { ...m, image: imageToUseForQuestion };
+        }
+        return m;
+      }));
+  
+      try {
+        const response = await contextualChatWithVision({ photoDataUri: imageToUseForQuestion, question: userQuestion });
+        addMessage({ id: Date.now().toString(), role: 'assistant', content: response.answer });
+        if(response.answer) speakText(response.answer);
+      } catch (error) {
+        console.error("Error in contextual chat:", error);
+        const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui.";
+        const aiErrorMsg = `Maaf, saya mengalami kesalahan saat memproses pertanyaan Anda dengan gambar: ${errorMessage}`;
+        addMessage({ id: Date.now().toString(), role: 'assistant', content: aiErrorMsg, isError: true });
+        speakText(aiErrorMsg);
         toast({
-          title: "Tidak Ada Gambar Baru untuk Pertanyaan Ini",
-          description: "Harap tangkap frame jika Anda ingin bertanya tentang konten visual tertentu yang baru.",
-          variant: "info"
+          title: "Kesalahan Obrolan AI",
+          description: `Gagal mendapatkan respons. ${errorMessage}`,
+          variant: "destructive",
         });
+      } finally {
         setIsLoading(false);
-        return;
-    }
-
-
-    // If we have imageContextForQuestion, proceed with contextual chat
-    try {
-      const response = await contextualChatWithVision({ photoDataUri: imageContextForQuestion, question: userQuestion });
-      addMessage({ id: Date.now().toString(), role: 'assistant', content: response.answer });
-      if(response.answer) speakText(response.answer);
-    } catch (error) {
-      console.error("Error in contextual chat:", error);
-      const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui.";
-      const aiErrorMsg = `Maaf, saya mengalami kesalahan: ${errorMessage}`;
-      addMessage({ id: Date.now().toString(), role: 'assistant', content: aiErrorMsg, isError: true });
-      speakText(aiErrorMsg);
-      toast({
-        title: "Kesalahan Obrolan AI",
-        description: `Gagal mendapatkan respons. ${errorMessage}`,
-        variant: "destructive",
-      });
-    } finally {
+      }
+    } else {
+      // Fallback: This case should ideally not be reached if the logic above is comprehensive.
+      // It implies isCameraActive is true, but imageToUseForQuestion remained undefined even after checks.
+      // Or camera off, image undefined (which should have been handled by Case 1).
+      const aiFallbackMsg = "Saya tidak yakin gambar mana yang harus dirujuk. Silakan coba aktifkan kamera dan tangkap frame baru jika pertanyaan Anda visual.";
+      addMessage({ id: Date.now().toString() + '-ai-fallback-err', role: 'assistant', content: aiFallbackMsg, isError: true });
+      speakText(aiFallbackMsg);
       setIsLoading(false);
     }
+  
   }, [addMessage, speakText, stopSpeaking, toast, isCameraActive, messages]);
 
   const toggleTts = () => {
@@ -222,3 +240,6 @@ const ChatPanel: FC<ChatPanelProps> = ({
 };
 
 export default ChatPanel;
+
+
+    
