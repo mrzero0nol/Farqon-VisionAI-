@@ -4,8 +4,6 @@
 import { useState } from 'react';
 import CameraFeed from '@/components/chat/camera-feed';
 import ChatPanel from '@/components/chat/chat-panel';
-import { Github, Eye } from 'lucide-react';
-import Link from 'next/link';
 
 export default function VisionAIChatPage() {
   const [capturedFrame, setCapturedFrame] = useState<string | null>(null);
@@ -25,27 +23,6 @@ export default function VisionAIChatPage() {
       <div className="fixed inset-0 z-0">
         <CameraFeed onFrameCapture={handleFrameCapture} isCameraActive={isCameraActive} setIsCameraActive={setIsCameraActive} />
       </div>
-
-      {/* Floating Header Elements */}
-      <header className="fixed top-0 left-0 right-0 p-4 sm:p-6 z-20 flex justify-between items-start sm:items-center">
-        <div className="bg-card/80 backdrop-blur-md p-3 rounded-lg shadow-xl">
-          <h1 className="text-xl sm:text-2xl font-bold text-primary flex items-center">
-            <Eye className="mr-2 h-6 w-6 sm:h-7 sm:w-7 text-accent" /> Farqon VisionAI
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-xs sm:max-w-sm">
-            Interact with your world through AI-powered vision.
-          </p>
-        </div>
-        <Link 
-          href="https://github.com/GoogleCloudPlatform/firebase-genkit-nextjs-template" 
-          target="_blank" 
-          rel="noopener noreferrer" 
-          aria-label="View source on GitHub"
-          className="bg-card/80 backdrop-blur-md p-3 rounded-full shadow-xl hover:bg-primary/10 transition-colors"
-        >
-           <Github className="h-6 w-6 sm:h-7 sm:w-7 text-foreground hover:text-primary transition-colors" />
-        </Link>
-      </header>
 
       {/* Floating Chat Panel */}
       <div className="fixed bottom-0 left-0 right-0 p-2 sm:p-4 z-10">
