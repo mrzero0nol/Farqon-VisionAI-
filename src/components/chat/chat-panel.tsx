@@ -28,6 +28,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
 }) => {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [isTtsEnabled, setIsTtsEnabled] = useState(true);
+  const [currentContextImageUri, setCurrentContextImageUri] = useState<string | null>(null);
   const chatContentRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -85,9 +86,9 @@ const ChatPanel: FC<ChatPanelProps> = ({
   }, [messages]);
 
   const handleAnalyzeScene = useCallback(async (imageDataUri: string) => {
-    // This function is now only called after a manual trigger and successful frame capture
     setIsAiAnalyzing(true);
     stopSpeaking();
+    setCurrentContextImageUri(imageDataUri); // Set the context image for subsequent questions
 
     try {
       console.log("ChatPanel: Sending frame for AI analysis.");
@@ -96,7 +97,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
         id: Date.now().toString() + '-manual-analysis', 
         role: 'assistant', 
         content: response.summary, 
-        image: imageDataUri 
+        image: imageDataUri // Display the newly analyzed image with the analysis
       });
       if (response.summary) speakText(response.summary);
     } catch (error) {
@@ -112,7 +113,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
     } finally {
       setIsAiAnalyzing(false);
     }
-  }, [addMessage, speakText, stopSpeaking, setIsAiAnalyzing, toast]);
+  }, [addMessage, speakText, stopSpeaking, setIsAiAnalyzing, toast, setCurrentContextImageUri]);
 
   const triggerManualSceneAnalysis = useCallback(async () => {
     if (isAiAnalyzing) {
@@ -129,7 +130,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
 
     if (imageDataUri) {
       console.log("ChatPanel: Manual frame captured successfully.");
-      await handleAnalyzeScene(imageDataUri);
+      await handleAnalyzeScene(imageDataUri); // Pass the new frame to handleAnalyzeScene
     } else {
       console.warn("ChatPanel: Failed to capture frame manually.");
       toast({ title: "Gagal Menangkap Gambar", description: "Tidak dapat menangkap gambar dari kamera. Pastikan kamera berfungsi.", variant: "destructive" });
@@ -141,13 +142,12 @@ const ChatPanel: FC<ChatPanelProps> = ({
     stopSpeaking();
     
     const userMessageId = Date.now().toString();
-    let imageToUseForQuestion: string | undefined = messages.slice().reverse().find(msg => msg.image)?.image;
-  
-    addMessage({ id: userMessageId, role: 'user', content: userQuestion, image: imageToUseForQuestion });
+    // Add user message. It will show currentContextImageUri if available.
+    addMessage({ id: userMessageId, role: 'user', content: userQuestion, image: currentContextImageUri });
     setIsAiAnalyzing(true); 
   
-    if (!imageToUseForQuestion) {
-      const aiErrorMsg = "Saat ini tidak ada gambar untuk dijadikan konteks pertanyaan Anda. Silakan analisis pemandangan terlebih dahulu menggunakan tombol 'Analisis Pemandangan'.";
+    if (!currentContextImageUri) { // Check if there's a context image from manual analysis
+      const aiErrorMsg = "Saat ini tidak ada gambar untuk dijadikan konteks pertanyaan Anda. Silakan analisis pemandangan terlebih dahulu menggunakan tombol 'Analisis Pemandangan' (ikon mata).";
       addMessage({ id: Date.now().toString() + '-ai-no-ctx', role: 'assistant', content: aiErrorMsg, isError: true });
       speakText(aiErrorMsg);
       toast({
@@ -160,8 +160,9 @@ const ChatPanel: FC<ChatPanelProps> = ({
     }
     
     try {
-      console.log("ChatPanel: Sending user question with image context to AI.");
-      const response = await contextualChatWithVision({ photoDataUri: imageToUseForQuestion, question: userQuestion });
+      console.log("ChatPanel: Sending user question with current context image to AI.");
+      // Use currentContextImageUri for the AI call
+      const response = await contextualChatWithVision({ photoDataUri: currentContextImageUri, question: userQuestion });
       addMessage({ id: Date.now().toString(), role: 'assistant', content: response.answer });
       if(response.answer) speakText(response.answer);
     } catch (error) {
@@ -179,7 +180,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
       setIsAiAnalyzing(false);
     }
   
-  }, [addMessage, speakText, stopSpeaking, toast, messages, setIsAiAnalyzing]);
+  }, [addMessage, speakText, stopSpeaking, toast, setIsAiAnalyzing, currentContextImageUri]);
 
   const toggleTts = () => {
     setIsTtsEnabled(prev => {
@@ -211,3 +212,4 @@ const ChatPanel: FC<ChatPanelProps> = ({
 };
 
 export default ChatPanel;
+
