@@ -27,12 +27,11 @@ const ChatPanel: FC<ChatPanelProps> = ({
 }) => {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [isTtsEnabled, setIsTtsEnabled] = useState(true);
-  // const [currentContextImageUri, setCurrentContextImageUri] = useState<string | null>(null); // Removed unused state
   const chatContentRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   const addMessage = useCallback((message: ChatMessageData) => {
-    setMessages(prev => [...prev, message]);
+    setMessages(prev => [message, ...prev]); // Prepend new messages
   }, []);
 
   const stopSpeaking = useCallback(() => {
@@ -74,15 +73,17 @@ const ChatPanel: FC<ChatPanelProps> = ({
     }
   }, []);
 
-  useEffect(() => {
-    if (chatContentRef.current) {
-      setTimeout(() => {
-        if (chatContentRef.current) {
-          chatContentRef.current.scrollTop = chatContentRef.current.scrollHeight;
-        }
-      }, 0);
-    }
-  }, [messages]);
+  // Removed useEffect that scrolled to bottom. With messages prepended,
+  // the default scroll position (top) is desired.
+  // useEffect(() => {
+  //   if (chatContentRef.current) {
+  //     setTimeout(() => {
+  //       if (chatContentRef.current) {
+  //         chatContentRef.current.scrollTop = chatContentRef.current.scrollHeight;
+  //       }
+  //     }, 0);
+  //   }
+  // }, [messages]);
   
   const handleSendMessage = useCallback(async (userQuestion: string) => {
     stopSpeaking();
@@ -107,12 +108,9 @@ const ChatPanel: FC<ChatPanelProps> = ({
       setIsAiAnalyzing(false);
       return;
     }
-  
-    // setCurrentContextImageUri(imageDataUri); // This line is removed as currentContextImageUri state is removed
     
     const userMessageId = Date.now().toString();
-    // Add user message with the captured image
-    addMessage({ id: userMessageId, role: 'user', content: userQuestion, image: imageDataUri });
+    addMessage({ id: userMessageId, role: 'user', content: userQuestion, image: imageDataUri }); // Image is not displayed per previous request, but kept in data
     
     try {
       console.log("ChatPanel: Sending user question with live camera frame to AI.");
