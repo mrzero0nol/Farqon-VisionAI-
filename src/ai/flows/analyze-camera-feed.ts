@@ -1,7 +1,7 @@
 // 'use server'
 'use server';
 /**
- * @fileOverview A Genkit flow for analyzing the camera feed and providing a summary of what it sees.
+ * @fileOverview A Genkit flow for analyzing the camera feed and providing a description of what it sees.
  *
  * - analyzeCameraFeed - A function that handles the camera feed analysis process.
  * - AnalyzeCameraFeedInput - The input type for the analyzeCameraFeed function.
@@ -21,7 +21,7 @@ const AnalyzeCameraFeedInputSchema = z.object({
 export type AnalyzeCameraFeedInput = z.infer<typeof AnalyzeCameraFeedInputSchema>;
 
 const AnalyzeCameraFeedOutputSchema = z.object({
-  summary: z.string().describe('A summary of what the chatbot sees in the camera feed.'),
+  summary: z.string().describe('A comprehensive description of what the chatbot sees in the camera feed.'),
 });
 export type AnalyzeCameraFeedOutput = z.infer<typeof AnalyzeCameraFeedOutputSchema>;
 
@@ -33,9 +33,10 @@ const analyzeCameraFeedPrompt = ai.definePrompt({
   name: 'analyzeCameraFeedPrompt',
   input: {schema: AnalyzeCameraFeedInputSchema},
   output: {schema: AnalyzeCameraFeedOutputSchema},
-  prompt: `You are an AI assistant that analyzes images from a camera feed and provides a brief summary of what you see.
-
-  Analyze the following image and provide a summary of the scene.
+  prompt: `You are an AI assistant that analyzes images from a camera feed. 
+  Your task is to describe everything you see in the provided image. 
+  Be comprehensive in your description, covering main objects, people (if any, describing their apparent actions or characteristics without guessing identity), background elements, and the overall context of the scene. 
+  Aim for a clear and informative description of the visual content.
 
   Image: {{media url=photoDataUri}}`,
 });
@@ -51,3 +52,4 @@ const analyzeCameraFeedFlow = ai.defineFlow(
     return output!;
   }
 );
+
