@@ -52,11 +52,20 @@ const ChatInput: FC<ChatInputProps> = ({
               interimTranscript += event.results[i][0].transcript;
             }
           }
-          setInputValue(finalTranscript || interimTranscript);
-          if (finalTranscript) {
-            // Optional: auto-send if final transcript is clear.
-            // For now, user needs to press send.
-            // setIsRecording(false); // stop recording after final result
+          
+          const currentDisplayValue = finalTranscript || interimTranscript;
+          setInputValue(currentDisplayValue);
+
+          if (finalTranscript.trim()) {
+            // Auto-send the message
+            onSendMessage(finalTranscript.trim());
+            setInputValue(''); // Clear the input field
+
+            // Ensure recognition stops and onend is triggered
+            // This might be redundant if continuous is false, but ensures clean stop
+            if (speechRecognitionRef.current && isRecording) { // isRecording check is a safeguard
+              speechRecognitionRef.current.stop();
+            }
           }
         };
 
@@ -67,7 +76,7 @@ const ChatInput: FC<ChatInputProps> = ({
             description: `Speech recognition error: ${event.error === 'no-speech' ? 'No speech detected.' : event.error === 'not-allowed' ? 'Microphone access denied.' : event.error}`,
             variant: 'destructive',
           });
-          setIsRecording(false);
+          setIsRecording(false); // Ensure recording state is reset on error
         };
 
         recognitionInstance.onend = () => {
@@ -82,10 +91,11 @@ const ChatInput: FC<ChatInputProps> = ({
 
     return () => {
       if (speechRecognitionRef.current) {
-        speechRecognitionRef.current.abort();
+        speechRecognitionRef.current.abort(); // Abort any ongoing recognition
       }
     };
-  }, [toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast, onSendMessage]); // Added onSendMessage to deps as it's used in onresult
 
   const handleMicClick = () => {
     stopSpeaking(); // Stop any ongoing TTS
@@ -95,8 +105,8 @@ const ChatInput: FC<ChatInputProps> = ({
     }
 
     if (isRecording) {
-      speechRecognitionRef.current.stop();
-      setIsRecording(false);
+      speechRecognitionRef.current.stop(); // This will trigger onend, which sets isRecording to false
+      // setIsRecording(false); // Let onend handle this for consistency
     } else {
       try {
         setInputValue(''); // Clear input before starting new recording
@@ -105,7 +115,7 @@ const ChatInput: FC<ChatInputProps> = ({
       } catch (error) {
         console.error("Error starting speech recognition:", error);
         toast({ title: "Voice Error", description: "Could not start voice input.", variant: "destructive" });
-        setIsRecording(false);
+        setIsRecording(false); // Reset if start fails
       }
     }
   };
@@ -116,7 +126,7 @@ const ChatInput: FC<ChatInputProps> = ({
 
     if (isRecording && speechRecognitionRef.current) {
       speechRecognitionRef.current.stop(); // Stop recording if user manually submits
-      setIsRecording(false);
+      // setIsRecording(false); // Let onend handle this
     }
     if (inputValue.trim() && !isLoading) {
       onSendMessage(inputValue.trim());
@@ -155,7 +165,7 @@ const ChatInput: FC<ChatInputProps> = ({
         variant="outline"
         className="rounded-full"
         onClick={onToggleCamera}
-        disabled={commonDisabled || isRecording}
+        disabled={commonDisabled || isRecording} // Disable camera toggle while recording
         aria-label={isCameraActive ? "Turn off camera" : "Turn on camera"}
       >
         {isCameraProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : isCameraActive ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
@@ -178,7 +188,7 @@ const ChatInput: FC<ChatInputProps> = ({
         type="submit"
         size="icon"
         className="rounded-full bg-accent hover:bg-accent/90 text-accent-foreground"
-        disabled={commonDisabled || !inputValue.trim()}
+        disabled={commonDisabled || !inputValue.trim()} // Disable send if input is empty OR commonDisabled
         aria-label="Send message"
       >
         {isLoading && !isCameraProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
