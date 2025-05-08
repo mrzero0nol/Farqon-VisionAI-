@@ -5,12 +5,15 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import CameraFeed from '@/components/chat/camera-feed';
 import ChatPanel from '@/components/chat/chat-panel';
 import type { CameraFeedRefType } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function VisionAIChatPage() {
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [isCameraProcessing, setIsCameraProcessing] = useState<boolean>(false); // For camera hardware start/stop
   const [isAiAnalyzing, setIsAiAnalyzing] = useState<boolean>(false); // For AI model processing
   const cameraFeedRef = useRef<CameraFeedRefType>(null);
+  const [showChatBubbles, setShowChatBubbles] = useState<boolean>(true);
 
   useEffect(() => {
     console.log(`Page: isCameraActive: ${isCameraActive}, isCameraProcessing: ${isCameraProcessing}, isAiAnalyzing: ${isAiAnalyzing}`);
@@ -40,6 +43,10 @@ export default function VisionAIChatPage() {
     setIsAiAnalyzing(false);
   }, []);
 
+  const handleToggleChatBubbles = useCallback(() => {
+    setShowChatBubbles(prev => !prev);
+  }, []);
+
 
   return (
     <div className="relative min-h-screen bg-background font-sans overflow-hidden"> {/* Added overflow-hidden to body container */}
@@ -54,8 +61,20 @@ export default function VisionAIChatPage() {
         />
       </div>
 
+      <div className="fixed top-4 left-4 z-20">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleToggleChatBubbles}
+          className="rounded-full bg-black/30 hover:bg-black/50 text-white border-white/30"
+          aria-label={showChatBubbles ? "Sembunyikan Obrolan" : "Tampilkan Obrolan"}
+        >
+          {showChatBubbles ? <EyeOff size={20} /> : <Eye size={20} />}
+        </Button>
+      </div>
+
       {/* Modified wrapper for ChatPanel to allow it to fill more screen height */}
-      <div className="fixed inset-x-0 top-0 bottom-0 p-2 sm:p-4 z-10 flex flex-col">
+      <div className="fixed inset-x-0 top-0 bottom-0 p-2 sm:p-4 z-10 flex flex-col pointer-events-none"> {/* Added pointer-events-none to allow interaction with elements behind if chat panel is mostly transparent */}
         <div className="max-w-2xl mx-auto w-full flex flex-col h-full"> {/* This container allows ChatPanel to use h-full */}
           <ChatPanel 
             cameraFeedRef={cameraFeedRef}
@@ -64,7 +83,8 @@ export default function VisionAIChatPage() {
             onToggleCamera={handleToggleCamera}
             isAiAnalyzing={isAiAnalyzing}
             setIsAiAnalyzing={setIsAiAnalyzing}
-            className="h-full" // Pass h-full to ChatPanel
+            showChatBubbles={showChatBubbles}
+            className="h-full pointer-events-auto" // Added pointer-events-auto to ChatPanel itself
           />
         </div>
       </div>

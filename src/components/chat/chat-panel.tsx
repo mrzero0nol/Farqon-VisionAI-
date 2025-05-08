@@ -17,6 +17,7 @@ interface ChatPanelProps {
   onToggleCamera: () => void;
   isAiAnalyzing: boolean; // AI model processing
   setIsAiAnalyzing: (isAnalyzing: boolean) => void;
+  showChatBubbles: boolean;
   className?: string; // Added className prop
 }
 
@@ -27,6 +28,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
   onToggleCamera,
   isAiAnalyzing,
   setIsAiAnalyzing,
+  showChatBubbles,
   className, // Destructure className
 }) => {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
@@ -134,13 +136,16 @@ const ChatPanel: FC<ChatPanelProps> = ({
   };
 
   return (
-    // Removed max-h properties, using className for height control (e.g., h-full from parent)
     <div className={cn("w-full flex flex-col overflow-hidden", className)}>
-      <ScrollArea className="flex-grow p-3 sm:p-4">
-        <div ref={chatContentRef} className="space-y-3">
-          {messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)}
-        </div>
-      </ScrollArea>
+      {showChatBubbles ? (
+        <ScrollArea className="flex-grow p-3 sm:p-4">
+          <div ref={chatContentRef} className="space-y-3">
+            {messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)}
+          </div>
+        </ScrollArea>
+      ) : (
+        <div className="flex-grow"></div> // Spacer to keep ChatInput at the bottom
+      )}
       <ChatInput
         onSendMessage={handleSendMessage}
         isLoading={isAiAnalyzing || isCameraProcessing} 
