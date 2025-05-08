@@ -36,7 +36,19 @@ const ChatMessage: FC<ChatMessageProps> = ({ message }) => {
         )}
       >
         <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-        {/* Image display removed as per user request */}
+        {/* 
+          Optionally, display counted object information here if needed in the future:
+          {message.countedObjects && message.countedObjects.length > 0 && (
+            <div className="mt-2 text-xs opacity-80">
+              <p>Objek Terhitung:</p>
+              <ul>
+                {message.countedObjects.map(obj => (
+                  <li key={obj.name}>{obj.name}: {obj.count}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        */}
       </div>
       {isUser && (
         <Avatar className="h-8 w-8 shrink-0">

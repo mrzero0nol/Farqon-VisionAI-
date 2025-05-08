@@ -5,14 +5,14 @@ import { useState, useRef, useEffect, type FC, useCallback, useImperativeHandle,
 import { Aperture, AlertCircle, VideoOff as VideoOffIconLucide } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import type { CameraFeedRefType } from '@/types';
+import type { CameraFeedRefType, CountedObject } from '@/types'; // Added CountedObject
 
 interface CameraFeedProps {
   isCameraActive: boolean;
   onStarted?: () => void;
   onStopped?: () => void;
   onErrorOccurred?: (errorMessage: string) => void;
-  isCameraProcessing?: boolean; 
+  isCameraProcessing?: boolean;
 }
 
 const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
@@ -23,9 +23,10 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
   isCameraProcessing,
 }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null); // Ref for canvas overlay
   const [internalStream, setInternalStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false); 
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const { toast } = useToast();
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | undefined>(undefined);
@@ -60,14 +61,91 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
         console.log("CameraFeed: Camera is busy (isLoading or isCameraProcessing is true), cannot toggle facing mode now.");
         return;
       }
-      setIsLoading(true); 
+      setIsLoading(true);
       setFacingMode(prevMode => {
         const newMode = prevMode === 'user' ? 'environment' : 'user';
         console.log(`CameraFeed: User requested switch to facingMode: ${newMode}. Current camera active state: ${isCameraActive}`);
         return newMode;
       });
-    }
-  }), [internalStream, isLoading, isCameraProcessing, isCameraActive]);
+    },
+    drawHighlights: (objects: CountedObject[] | null) => {
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+
+      if (!canvas || !video || !video.videoWidth || !video.videoHeight) {
+        if (canvas) {
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            canvas.width = canvas.clientWidth; // Match display size for clearing
+            canvas.height = canvas.clientHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+          }
+        }
+        if (!objects) return; 
+        console.warn("CameraFeed: Canvas or video not ready for drawing highlights.");
+        return;
+      }
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error("CameraFeed: Could not get canvas 2D context.");
+        return;
+      }
+
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+
+      const vidWidth = video.videoWidth;
+      const vidHeight = video.videoHeight;
+      const canWidth = canvas.width;
+      const canHeight = canvas.height;
+
+      const vidAspectRatio = vidWidth / vidHeight;
+      const canAspectRatio = canWidth / canHeight;
+
+      let drawX = 0, drawY = 0, drawWidth = 0, drawHeight = 0;
+
+      if (vidAspectRatio > canAspectRatio) {
+        drawHeight = canHeight;
+        drawWidth = drawHeight * vidAspectRatio;
+        drawX = (canWidth - drawWidth) / 2;
+        drawY = 0;
+      } else {
+        drawWidth = canWidth;
+        drawHeight = drawWidth / vidAspectRatio;
+        drawY = (canHeight - drawHeight) / 2;
+        drawX = 0;
+      }
+
+      ctx.clearRect(0, 0, canWidth, canHeight);
+
+      if (objects && objects.length > 0) {
+        ctx.strokeStyle = 'rgba(52, 211, 153, 0.9)'; // Emerald-like color for circles
+        ctx.lineWidth = Math.max(2, Math.min(canWidth, canHeight) * 0.007); // Slightly thicker line
+
+        objects.forEach(obj => {
+          obj.instances.forEach((instance) => {
+            const { x, y, width, height } = instance.boundingBox;
+
+            const rectX = drawX + (x * drawWidth);
+            const rectY = drawY + (y * drawHeight);
+            const rectWidth = width * drawWidth;
+            const rectHeight = height * drawHeight;
+            
+            const centerX = rectX + rectWidth / 2;
+            const centerY = rectY + rectHeight / 2;
+            const radius = (Math.min(rectWidth, rectHeight) / 2) * 0.9; // Circle radius based on smaller dimension
+
+            if (radius > ctx.lineWidth / 2) { // Ensure radius is large enough to be visible
+              ctx.beginPath();
+              ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+              ctx.stroke();
+            }
+          });
+        });
+      }
+    },
+  }), [internalStream, isLoading, isCameraProcessing, isCameraActive, videoRef, canvasRef]);
 
   const stopCameraTracks = useCallback((streamToStop: MediaStream | null, reason: string) => {
     if (streamToStop) {
@@ -107,15 +185,15 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
       } else {
         console.warn("CameraFeed: MediaDevices API not available.");
         const unsupportedMessage = "Akses kamera tidak didukung oleh browser ini.";
-        setError(unsupportedMessage); // Set component error state
+        setError(unsupportedMessage);
         setHasCameraPermission(false);
         if (onErrorOccurred) onErrorOccurred(unsupportedMessage);
       }
     };
-    if(hasCameraPermission === undefined) { 
+    if(hasCameraPermission === undefined) {
         getInitialCameraPermission();
     }
-  }, [onErrorOccurred, stopCameraTracks, toast, hasCameraPermission]); // Keep hasCameraPermission to re-check if it becomes undefined somehow
+  }, [onErrorOccurred, stopCameraTracks, toast, hasCameraPermission]);
 
 
   useEffect(() => {
@@ -124,23 +202,23 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
     const startCamera = async () => {
       if (hasCameraPermission === false) {
         console.log("CameraFeed: Cannot start camera, permission not granted or explicitly denied.");
-        setIsLoading(false); 
-        if (onErrorOccurred) { // Removed !error condition to always report if permission is issue
+        setIsLoading(false);
+        if (onErrorOccurred) {
              const permError = "Izin kamera belum diberikan atau ditolak.";
-             onErrorOccurred(permError); 
-             setError(permError); // Also set local error state
+             onErrorOccurred(permError);
+             setError(permError);
         }
         return;
       }
       if (hasCameraPermission === undefined) {
         console.log("CameraFeed: Waiting for permission check to complete.");
-        setIsLoading(true); 
+        setIsLoading(true);
         return;
       }
 
       console.log(`CameraFeed: Attempting to start camera. Active: ${isCameraActive}, Mode: ${facingMode}`);
       
-      setError(null); 
+      setError(null);
       setIsLoading(true);
 
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -159,7 +237,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
                  videoRef.current?.play().then(() => {
                     console.log("CameraFeed: videoRef.play() successful.");
                     setIsLoading(false);
-                    setError(null); 
+                    setError(null);
                     if (onStarted) onStarted();
                  }).catch((playError) => {
                     console.error("CameraFeed: videoRef.play() failed:", playError);
@@ -203,7 +281,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
               case 'DevicesNotFoundError':
                 userFriendlyMessage = `Kamera mode '${facingMode}' tidak ditemukan.`;
                 break;
-              case 'OverconstrainedError': // Often implies "Could not start video source" if constraints too specific
+              case 'OverconstrainedError':
                  userFriendlyMessage = `Tidak dapat memenuhi batasan untuk kamera mode '${facingMode}'. Perangkat mungkin tidak mendukung mode ini atau resolusi yang diminta. (Detail: ${technicalMessage})`;
                  if (technicalMessage.toLowerCase().includes("could not start video source")) {
                      userFriendlyMessage = `Tidak dapat memulai sumber video untuk mode '${facingMode}'. Ini mungkin karena mode tidak tersedia, atau ada konflik. (Detail: ${technicalMessage})`;
@@ -212,12 +290,12 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
               case 'NotAllowedError':
               case 'PermissionDeniedError':
                 userFriendlyMessage = `Izin akses kamera ditolak. Silakan aktifkan izin kamera di pengaturan browser Anda.`;
-                setHasCameraPermission(false); 
+                setHasCameraPermission(false);
                 break;
               case 'AbortError':
                 userFriendlyMessage = `Akses kamera dibatalkan.`;
                 break;
-              case 'NotReadableError': // Can also imply "Could not start video source"
+              case 'NotReadableError':
               case 'TrackStartError':
                 userFriendlyMessage = `Kamera mungkin sedang digunakan oleh aplikasi lain, atau ada masalah dengan perangkat keras kamera (mode '${facingMode}'). (Detail: ${technicalMessage})`;
                 if (technicalMessage.toLowerCase().includes("could not start video source")) {
@@ -233,8 +311,8 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
           toast({ title: "Kesalahan Kamera", description: userFriendlyMessage, variant: "destructive" });
           setIsLoading(false);
           if (onErrorOccurred) onErrorOccurred(userFriendlyMessage);
-          setInternalStream(null); 
-          effectInstanceStream = null; 
+          setInternalStream(null);
+          effectInstanceStream = null;
         }
       } else {
         const unsupportedMessage = "Akses kamera tidak didukung oleh browser ini.";
@@ -243,38 +321,42 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
         setIsLoading(false);
         if (onErrorOccurred) onErrorOccurred(unsupportedMessage);
         setInternalStream(null);
-        effectInstanceStream = null; 
+        effectInstanceStream = null;
       }
     };
 
     if (isCameraActive) {
       console.log("CameraFeed: useEffect - Camera active, proceeding to start/ensure camera.");
       startCamera();
-    } else { 
-      // This internalStream is from component state.
-      // The effect's own stream (effectInstanceStream) will be cleaned up by the return function.
+    } else {
       console.log("CameraFeed: useEffect - Camera inactive. Current internalStream from state:", internalStream?.id);
-      if (internalStream) { 
+      if (internalStream) {
         stopCameraTracks(internalStream, "camera becoming inactive (from state)");
-        setInternalStream(null); 
+        setInternalStream(null);
         if (videoRef.current) {
           videoRef.current.srcObject = null;
           videoRef.current.pause();
         }
+        // Clear highlights when camera is turned off
+        if (canvasRef.current) {
+          const ctx = canvasRef.current.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+          }
+        }
       }
-      setIsLoading(false); 
-      setError(null); // Clear errors when camera is intentionally stopped
-      if (onStopped) onStopped(); 
+      setIsLoading(false);
+      setError(null);
+      if (onStopped) onStopped();
     }
 
     return () => {
       console.log(`CameraFeed: useEffect cleanup for facingMode: ${facingMode}, isCameraActive: ${isCameraActive}. Stopping effectInstanceStream: ${effectInstanceStream?.id}`);
-      stopCameraTracks(effectInstanceStream, "useEffect cleanup"); 
+      stopCameraTracks(effectInstanceStream, "useEffect cleanup");
       if (videoRef.current && videoRef.current.srcObject === effectInstanceStream && effectInstanceStream !== null) {
-        videoRef.current.srcObject = null; 
+        videoRef.current.srcObject = null;
         videoRef.current.pause();
       }
-      // Ensure internalStream is cleared if it was the one managed by this effect instance
       setInternalStream(current => {
         if (current === effectInstanceStream) {
           console.log("CameraFeed: useEffect cleanup - clearing internalStream as it matches the effectInstanceStream being cleaned up.");
@@ -282,15 +364,14 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
         }
         return current;
       });
-      setIsLoading(false); // Reset loading state on cleanup
+      setIsLoading(false);
     };
-  // Core dependencies that drive the camera's state. Callbacks should be stable.
   }, [isCameraActive, facingMode, hasCameraPermission, stopCameraTracks, onErrorOccurred, onStarted, onStopped, toast]);
 
 
   const showLoadingIndicator = isLoading || (isCameraActive && hasCameraPermission === undefined) || (isCameraActive && hasCameraPermission && !internalStream && !error && !isCameraProcessing);
   const showVideo = isCameraActive && internalStream && !isLoading && hasCameraPermission && !error;
-  const showCameraOffMessage = !isCameraActive && !isLoading && (hasCameraPermission === true || hasCameraPermission === undefined) && !error; 
+  const showCameraOffMessage = !isCameraActive && !isLoading && (hasCameraPermission === true || hasCameraPermission === undefined) && !error;
   const showPermissionNeededMessage = hasCameraPermission === false && !isLoading;
   const showErrorAlert = error && !isLoading;
 
@@ -300,19 +381,31 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
       <video
         ref={videoRef}
         autoPlay
-        playsInline 
-        muted 
+        playsInline
+        muted
         className={`w-full h-full object-cover ${showVideo ? 'block' : 'hidden'}`}
         onLoadedData={() => console.log("CameraFeed: Video data loaded.")}
-        onCanPlay={() => console.log("CameraFeed: Video can play.")}
+        onCanPlay={() => {
+          console.log("CameraFeed: Video can play.");
+          if (canvasRef.current && videoRef.current) {
+            // Ensure canvas matches the video's display dimensions
+            canvasRef.current.width = videoRef.current.clientWidth;
+            canvasRef.current.height = videoRef.current.clientHeight;
+          }
+        }}
         onError={(e) => {
           console.error("CameraFeed: Video element direct error event:", e);
-          if (!error) { 
+          if (!error) {
             const videoElementErrorMsg = "Terjadi kesalahan pada elemen video.";
             setError(videoElementErrorMsg);
             if(onErrorOccurred) onErrorOccurred(videoElementErrorMsg);
           }
         }}
+      />
+      <canvas
+        ref={canvasRef}
+        className="absolute top-0 left-0 w-full h-full pointer-events-none"
+        // Initial dimensions will be set on video canPlay or when drawing
       />
 
       {showCameraOffMessage && (
@@ -359,4 +452,3 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
 
 CameraFeed.displayName = 'CameraFeed';
 export default CameraFeed;
-

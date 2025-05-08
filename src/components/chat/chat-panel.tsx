@@ -48,9 +48,8 @@ const ChatPanel: FC<ChatPanelProps> = ({
 
   const speakText = useCallback((text: string) => {
     if (typeof window !== 'undefined' && window.speechSynthesis && text && isTtsEnabled) {
-      window.speechSynthesis.cancel(); 
-      // Remove asterisks from the text before sending to TTS
-      const cleanedText = text.replace(/\*/g, ''); 
+      window.speechSynthesis.cancel();
+      const cleanedText = text.replace(/\*/g, '');
       const utterance = new SpeechSynthesisUtterance(cleanedText);
       const voices = window.speechSynthesis.getVoices();
       const indonesianVoice = voices.find(voice => voice.lang === 'id-ID' || voice.lang.startsWith('id-'));
@@ -68,20 +67,18 @@ const ChatPanel: FC<ChatPanelProps> = ({
   useEffect(() => {
     const loadVoices = () => {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
-        // Ensure voices are loaded
         const voices = window.speechSynthesis.getVoices();
         if (voices.length === 0) {
           // For some browsers, onvoiceschanged needs to fire first.
-          // This is a common pattern to ensure they are loaded.
         }
       }
     };
     if (typeof window !== 'undefined' && window.speechSynthesis) {
-      loadVoices(); 
+      loadVoices();
       window.speechSynthesis.onvoiceschanged = loadVoices;
       return () => {
         window.speechSynthesis.onvoiceschanged = null;
-        window.speechSynthesis.cancel(); 
+        window.speechSynthesis.cancel();
       };
     }
   }, []);
@@ -89,45 +86,66 @@ const ChatPanel: FC<ChatPanelProps> = ({
   const handleSendMessage = useCallback(async (userQuestion: string) => {
     stopSpeaking();
     setIsAiAnalyzing(true);
+    
+    // Clear previous highlights before sending new message or if camera is off
+    if (cameraFeedRef.current?.drawHighlights) {
+        cameraFeedRef.current.drawHighlights(null);
+    }
   
     let imageDataUri: string | null = null;
     if (isCameraActive && cameraFeedRef.current) {
       imageDataUri = cameraFeedRef.current.captureCurrentFrame();
       if (!imageDataUri) {
-        // Non-fatal, proceed without image if capture fails but camera active
         console.warn("ChatPanel: Camera is active, but failed to capture frame. Proceeding without image for this turn.");
         toast({ title: "Peringatan Kamera", description: "Gagal menangkap gambar dari kamera untuk pertanyaan ini. AI akan merespons tanpa gambar baru.", variant: "default" });
       }
     } else if (!isCameraActive) {
       console.log("ChatPanel: Camera is not active. Sending message without new image.");
-      // Allow sending message even if camera is off, AI will rely on history or question only
     }
     
     const userMessageData: ChatMessageData = {
       id: Date.now().toString(),
       role: 'user',
       content: userQuestion,
-      image: imageDataUri ?? undefined // Store image with user message if captured
+      image: imageDataUri ?? undefined
     };
 
-    // Prepare history. `messages` state is [latestMsg, ..., oldestMsg]
-    // We need history as [oldestMsg, ..., latestMsg (which is previous to current user input)]
-    // So, reverse the current `messages` state before adding the new user message.
     const historyForAI = [...messages]
-      .reverse() // [oldest, ..., mostRecentPrevious]
-      .map(msg => ({ role: msg.role, content: msg.content })); // Extract only role and content for history
+      .reverse()
+      .map(msg => ({ role: msg.role, content: msg.content }));
 
-    addMessage(userMessageData); // Add current user message to UI
+    addMessage(userMessageData);
     
     try {
       console.log("ChatPanel: Sending to AI. Image for this turn:", imageDataUri ? "Present" : "Absent", "History items:", historyForAI.length);
       const response = await contextualChatWithVision({
-        photoDataUri: imageDataUri ?? undefined, // Pass undefined if no image
+        photoDataUri: imageDataUri ?? undefined,
         question: userQuestion,
         history: historyForAI
       });
-      addMessage({ id: Date.now().toString(), role: 'assistant', content: response.answer });
-      if(response.answer) speakText(response.answer);
+
+      const assistantMessageData: ChatMessageData = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: response.answer,
+        countedObjects: response.countedObjects, // Store counted objects with the message
+      };
+      addMessage(assistantMessageData);
+
+      if (response.answer) speakText(response.answer);
+
+      // Draw highlights if objects were counted
+      if (response.countedObjects && response.countedObjects.length > 0) {
+        if (cameraFeedRef.current?.drawHighlights) {
+          cameraFeedRef.current.drawHighlights(response.countedObjects);
+        }
+      } else {
+        // Ensure highlights are cleared if no objects were counted or if camera is off
+         if (cameraFeedRef.current?.drawHighlights) {
+          cameraFeedRef.current.drawHighlights(null);
+        }
+      }
+
     } catch (error) {
       console.error("Error in contextual chat:", error);
       const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui.";
@@ -139,6 +157,10 @@ const ChatPanel: FC<ChatPanelProps> = ({
         description: `Gagal mendapatkan respons. ${errorMessage}`,
         variant: "destructive",
       });
+      // Clear highlights on error
+      if (cameraFeedRef.current?.drawHighlights) {
+          cameraFeedRef.current.drawHighlights(null);
+      }
     } finally {
       setIsAiAnalyzing(false);
     }
@@ -147,7 +169,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
 
   const toggleTts = () => {
     setIsTtsEnabled(prev => {
-      if (prev) stopSpeaking(); 
+      if (prev) stopSpeaking();
       return !prev;
     });
   };
@@ -155,6 +177,10 @@ const ChatPanel: FC<ChatPanelProps> = ({
   const handleToggleFacingMode = useCallback(() => {
     if (cameraFeedRef.current?.toggleFacingMode) {
       cameraFeedRef.current.toggleFacingMode();
+    }
+     // Clear highlights when toggling camera as the view changes
+    if (cameraFeedRef.current?.drawHighlights) {
+        cameraFeedRef.current.drawHighlights(null);
     }
   }, [cameraFeedRef]);
 
@@ -167,15 +193,21 @@ const ChatPanel: FC<ChatPanelProps> = ({
           </div>
         </ScrollArea>
       ) : (
-        <div className="flex-grow"></div> // Spacer to keep ChatInput at the bottom
+        <div className="flex-grow"></div>
       )}
       <ChatInput
         onSendMessage={handleSendMessage}
-        isLoading={isAiAnalyzing || isCameraProcessing} 
+        isLoading={isAiAnalyzing || isCameraProcessing}
         isCameraActive={isCameraActive}
         isCameraProcessing={isCameraProcessing}
-        onToggleCamera={onToggleCamera}
-        onToggleFacingMode={handleToggleFacingMode} // Pass the handler
+        onToggleCamera={() => {
+          onToggleCamera();
+           // Clear highlights when toggling camera state
+          if (cameraFeedRef.current?.drawHighlights) {
+            cameraFeedRef.current.drawHighlights(null);
+          }
+        }}
+        onToggleFacingMode={handleToggleFacingMode}
         isTtsEnabled={isTtsEnabled}
         onToggleTts={toggleTts}
         stopSpeaking={stopSpeaking}
