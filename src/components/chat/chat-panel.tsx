@@ -66,7 +66,12 @@ const ChatPanel: FC<ChatPanelProps> = ({
   useEffect(() => {
     const loadVoices = () => {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.getVoices(); 
+        // Ensure voices are loaded
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length === 0) {
+          // For some browsers, onvoiceschanged needs to fire first.
+          // This is a common pattern to ensure they are loaded.
+        }
       }
     };
     if (typeof window !== 'undefined' && window.speechSynthesis) {
@@ -83,38 +88,48 @@ const ChatPanel: FC<ChatPanelProps> = ({
     stopSpeaking();
     setIsAiAnalyzing(true);
   
-    if (!isCameraActive || !cameraFeedRef.current) {
-      const errorMsg = "Kamera tidak aktif. Aktifkan kamera untuk bertanya tentang apa yang dilihatnya.";
-      addMessage({ id: Date.now().toString(), role: 'assistant', content: errorMsg, isError: true });
-      speakText(errorMsg);
-      toast({ title: "Kamera Tidak Aktif", description: errorMsg, variant: "destructive" });
-      setIsAiAnalyzing(false);
-      return;
-    }
-  
-    const imageDataUri = cameraFeedRef.current.captureCurrentFrame();
-  
-    if (!imageDataUri) {
-      const errorMsg = "Tidak dapat menangkap gambar dari kamera. Pastikan kamera berfungsi dan berikan izin.";
-      addMessage({ id: Date.now().toString(), role: 'assistant', content: errorMsg, isError: true });
-      speakText(errorMsg);
-      toast({ title: "Gagal Menangkap Gambar", description: errorMsg, variant: "destructive" });
-      setIsAiAnalyzing(false);
-      return;
+    let imageDataUri: string | null = null;
+    if (isCameraActive && cameraFeedRef.current) {
+      imageDataUri = cameraFeedRef.current.captureCurrentFrame();
+      if (!imageDataUri) {
+        // Non-fatal, proceed without image if capture fails but camera active
+        console.warn("ChatPanel: Camera is active, but failed to capture frame. Proceeding without image for this turn.");
+        toast({ title: "Peringatan Kamera", description: "Gagal menangkap gambar dari kamera untuk pertanyaan ini. AI akan merespons tanpa gambar baru.", variant: "default" });
+      }
+    } else if (!isCameraActive) {
+      console.log("ChatPanel: Camera is not active. Sending message without new image.");
+      // Allow sending message even if camera is off, AI will rely on history or question only
     }
     
-    const userMessageId = Date.now().toString();
-    addMessage({ id: userMessageId, role: 'user', content: userQuestion, image: imageDataUri });
+    const userMessageData: ChatMessageData = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: userQuestion,
+      image: imageDataUri ?? undefined // Store image with user message if captured
+    };
+
+    // Prepare history. `messages` state is [latestMsg, ..., oldestMsg]
+    // We need history as [oldestMsg, ..., latestMsg (which is previous to current user input)]
+    // So, reverse the current `messages` state before adding the new user message.
+    const historyForAI = [...messages]
+      .reverse() // [oldest, ..., mostRecentPrevious]
+      .map(msg => ({ role: msg.role, content: msg.content })); // Extract only role and content for history
+
+    addMessage(userMessageData); // Add current user message to UI
     
     try {
-      console.log("ChatPanel: Sending user question with live camera frame to AI.");
-      const response = await contextualChatWithVision({ photoDataUri: imageDataUri, question: userQuestion });
+      console.log("ChatPanel: Sending to AI. Image for this turn:", imageDataUri ? "Present" : "Absent", "History items:", historyForAI.length);
+      const response = await contextualChatWithVision({
+        photoDataUri: imageDataUri ?? undefined, // Pass undefined if no image
+        question: userQuestion,
+        history: historyForAI
+      });
       addMessage({ id: Date.now().toString(), role: 'assistant', content: response.answer });
       if(response.answer) speakText(response.answer);
     } catch (error) {
       console.error("Error in contextual chat:", error);
       const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui.";
-      const aiErrorMsg = `Maaf, saya mengalami kesalahan saat memproses pertanyaan Anda dengan gambar: ${errorMessage.substring(0, 150)}...`;
+      const aiErrorMsg = `Maaf, saya mengalami kesalahan saat memproses pertanyaan Anda: ${errorMessage.substring(0, 150)}...`;
       addMessage({ id: Date.now().toString(), role: 'assistant', content: aiErrorMsg, isError: true });
       speakText(`Terjadi kesalahan: ${errorMessage.substring(0,50)}`);
       toast({
@@ -126,7 +141,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
       setIsAiAnalyzing(false);
     }
   
-  }, [addMessage, speakText, stopSpeaking, toast, setIsAiAnalyzing, isCameraActive, cameraFeedRef]);
+  }, [messages, addMessage, speakText, stopSpeaking, toast, setIsAiAnalyzing, isCameraActive, cameraFeedRef]);
 
   const toggleTts = () => {
     setIsTtsEnabled(prev => {
