@@ -10,9 +10,9 @@ import { useToast } from '@/hooks/use-toast';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
-  isLoading: boolean; // For AI message loading
+  isLoading: boolean; // Combined: AI analysis OR camera hardware processing
   isCameraActive: boolean;
-  isCameraProcessing: boolean;
+  isCameraProcessing: boolean; // Specifically for camera hardware start/stop
   onToggleCamera: () => void;
   isTtsEnabled: boolean;
   onToggleTts: () => void;
@@ -21,9 +21,9 @@ interface ChatInputProps {
 
 const ChatInput: FC<ChatInputProps> = ({
   onSendMessage,
-  isLoading,
+  isLoading, // This now represents (isAiAnalyzing || isCameraProcessing) from parent
   isCameraActive,
-  isCameraProcessing,
+  isCameraProcessing, // Keep this for the camera button's specific loader
   onToggleCamera,
   isTtsEnabled,
   onToggleTts,
@@ -31,7 +31,7 @@ const ChatInput: FC<ChatInputProps> = ({
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const speechRecognitionRef = useRef<any>(null); // SpeechRecognition instance
+  const speechRecognitionRef = useRef<any>(null); 
   const { toast } = useToast();
 
   useEffect(() => {
@@ -39,9 +39,9 @@ const ChatInput: FC<ChatInputProps> = ({
       const SpeechRecognitionAPI = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognitionAPI) {
         const recognitionInstance = new SpeechRecognitionAPI();
-        recognitionInstance.continuous = false; // Process single utterances
-        recognitionInstance.interimResults = true; // Show interim results
-        recognitionInstance.lang = 'id-ID'; // Set language to Indonesian for better recognition
+        recognitionInstance.continuous = false; 
+        recognitionInstance.interimResults = true; 
+        recognitionInstance.lang = 'id-ID'; 
 
         recognitionInstance.onresult = (event: any) => {
           let interimTranscript = '';
@@ -58,13 +58,9 @@ const ChatInput: FC<ChatInputProps> = ({
           setInputValue(currentDisplayValue);
 
           if (finalTranscript.trim()) {
-            // Auto-send the message
             onSendMessage(finalTranscript.trim());
-            setInputValue(''); // Clear the input field
-
-            // Ensure recognition stops and onend is triggered
-            // This might be redundant if continuous is false, but ensures clean stop
-            if (speechRecognitionRef.current && isRecording) { // isRecording check is a safeguard
+            setInputValue(''); 
+            if (speechRecognitionRef.current && isRecording) { 
               speechRecognitionRef.current.stop();
             }
           }
@@ -77,65 +73,62 @@ const ChatInput: FC<ChatInputProps> = ({
             description: `Kesalahan pengenalan ucapan: ${event.error === 'no-speech' ? 'Tidak ada ucapan terdeteksi.' : event.error === 'not-allowed' ? 'Akses mikrofon ditolak.' : event.error}`,
             variant: 'destructive',
           });
-          setIsRecording(false); // Ensure recording state is reset on error
+          setIsRecording(false); 
         };
 
         recognitionInstance.onend = () => {
           setIsRecording(false);
         };
         speechRecognitionRef.current = recognitionInstance;
-      } else {
-        // Toast shown once if API not supported, not on every render.
-        // This could be moved to a top-level component or context if needed globally.
       }
     }
 
     return () => {
       if (speechRecognitionRef.current) {
-        speechRecognitionRef.current.abort(); // Abort any ongoing recognition
+        speechRecognitionRef.current.abort(); 
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast, onSendMessage]); // Added onSendMessage to deps as it's used in onresult
+  }, [toast, onSendMessage]); 
 
   const handleMicClick = () => {
-    stopSpeaking(); // Stop any ongoing TTS
+    stopSpeaking(); 
     if (!speechRecognitionRef.current) {
       toast({ title: "Input Suara Tidak Didukung", description: "Browser Anda tidak mendukung pengenalan ucapan.", variant: "destructive" });
       return;
     }
 
     if (isRecording) {
-      speechRecognitionRef.current.stop(); // This will trigger onend, which sets isRecording to false
-      // setIsRecording(false); // Let onend handle this for consistency
+      speechRecognitionRef.current.stop(); 
     } else {
       try {
-        setInputValue(''); // Clear input before starting new recording
+        setInputValue(''); 
         speechRecognitionRef.current.start();
         setIsRecording(true);
       } catch (error) {
         console.error("Error starting speech recognition:", error);
         toast({ title: "Kesalahan Suara", description: "Tidak dapat memulai input suara.", variant: "destructive" });
-        setIsRecording(false); // Reset if start fails
+        setIsRecording(false); 
       }
     }
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    stopSpeaking(); // Stop any ongoing TTS
+    stopSpeaking(); 
 
     if (isRecording && speechRecognitionRef.current) {
-      speechRecognitionRef.current.stop(); // Stop recording if user manually submits
-      // setIsRecording(false); // Let onend handle this
+      speechRecognitionRef.current.stop(); 
     }
-    if (inputValue.trim() && !isLoading) {
+    if (inputValue.trim() && !isLoading) { // Use the combined isLoading prop
       onSendMessage(inputValue.trim());
       setInputValue('');
     }
   };
   
-  const commonDisabled = isLoading || isCameraProcessing;
+  // General disable condition for most interactive elements.
+  // isLoading (isAiAnalyzing || isCameraProcessing) already covers camera processing.
+  const commonDisabled = isLoading; 
 
   return (
     <form 
@@ -169,9 +162,10 @@ const ChatInput: FC<ChatInputProps> = ({
         variant="outline"
         className="rounded-full border-white/30 bg-white/20 hover:bg-white/30 text-white"
         onClick={onToggleCamera}
-        disabled={commonDisabled || isRecording} // Disable camera toggle while recording
+        disabled={isLoading || isRecording} // Camera toggle disabled if any loading OR recording
         aria-label={isCameraActive ? "Matikan kamera" : "Nyalakan kamera"}
       >
+        {/* Specific loader for camera hardware processing */}
         {isCameraProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : isCameraActive ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
       </Button>
        <Button
@@ -181,7 +175,7 @@ const ChatInput: FC<ChatInputProps> = ({
         className="rounded-full border-white/30 bg-white/20 hover:bg-white/30 text-white"
         onClick={() => {
           onToggleTts();
-          if (isTtsEnabled) stopSpeaking(); // If turning off, stop current speech
+          if (isTtsEnabled) stopSpeaking(); 
         }}
         disabled={commonDisabled}
         aria-label={isTtsEnabled ? "Nonaktifkan suara AI" : "Aktifkan suara AI"}
@@ -192,9 +186,10 @@ const ChatInput: FC<ChatInputProps> = ({
         type="submit"
         size="icon"
         className="rounded-full bg-accent hover:bg-accent/90 text-accent-foreground"
-        disabled={commonDisabled || !inputValue.trim()} // Disable send if input is empty OR commonDisabled
+        disabled={commonDisabled || !inputValue.trim()} 
         aria-label="Kirim pesan"
       >
+        {/* General loader if any AI analysis or camera processing is happening (but not specifically camera hardware) */}
         {isLoading && !isCameraProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
       </Button>
     </form>
@@ -202,4 +197,3 @@ const ChatInput: FC<ChatInputProps> = ({
 };
 
 export default ChatInput;
-

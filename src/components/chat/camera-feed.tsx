@@ -2,31 +2,38 @@
 'use client';
 
 import { useState, useRef, useEffect, type FC, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
 import { Aperture, AlertCircle, VideoOff as VideoOffIconLucide } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface CameraFeedProps {
-  onFrameCapture: (dataUri: string) => void;
-  isCameraActive: boolean; // Controlled by parent
+  onFrameForAnalysis: (dataUri: string | null) => void; // Renamed for clarity
+  isCameraActive: boolean; 
   onStarted?: () => void;
   onStopped?: () => void;
   onErrorOccurred?: (errorMessage: string) => void;
+  analysisIntervalMs?: number;
+  isAiAnalyzing: boolean;
 }
 
+const DEFAULT_ANALYSIS_INTERVAL = 7000; // Default 7 seconds
+
 const CameraFeed: FC<CameraFeedProps> = ({ 
-  onFrameCapture, 
-  isCameraActive, // This prop now directly drives the camera state
+  onFrameForAnalysis,
+  isCameraActive,
   onStarted,
   onStopped,
-  onErrorOccurred
+  onErrorOccurred,
+  analysisIntervalMs = DEFAULT_ANALYSIS_INTERVAL,
+  isAiAnalyzing,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [internalStream, setInternalStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false); 
   const { toast } = useToast();
+  const analysisIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCaptureTimeRef = useRef<number>(0);
 
   const stopCameraTracks = useCallback((streamToStop: MediaStream | null) => {
     if (streamToStop) {
@@ -38,60 +45,80 @@ const CameraFeed: FC<CameraFeedProps> = ({
     }
   }, []);
 
+  const captureAndSendFrameForAnalysis = useCallback(() => {
+    if (videoRef.current && internalStream && videoRef.current.readyState >= videoRef.current.HAVE_CURRENT_DATA && !isAiAnalyzing && isCameraActive) {
+      const now = Date.now();
+      // Debounce captures if analysis is quick or interval is very short
+      if (now - lastCaptureTimeRef.current < analysisIntervalMs / 2 && lastCaptureTimeRef.current !== 0) {
+          // console.log("CameraFeed: Skipping auto-capture, too soon.");
+          return;
+      }
+
+      const videoElement = videoRef.current;
+      if (videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
+        console.warn("CameraFeed: Auto-Capture - video dimensions are zero. Skipping frame.");
+        return;
+      }
+
+      console.log(`CameraFeed: Auto-capturing frame for analysis. Dimensions: ${videoElement.videoWidth}x${videoElement.videoHeight}`);
+      const canvas = document.createElement('canvas');
+      canvas.width = videoElement.videoWidth;
+      canvas.height = videoElement.videoHeight;
+      const context = canvas.getContext('2d');
+      if (context) {
+        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+        const dataUri = canvas.toDataURL('image/jpeg', 0.85); // Quality for analysis
+        onFrameForAnalysis(dataUri);
+        lastCaptureTimeRef.current = now;
+        console.log("CameraFeed: Auto-frame captured and sent for analysis.");
+      } else {
+         console.error("CameraFeed: Auto-Capture - Could not get canvas context.");
+      }
+    } else if (isAiAnalyzing) {
+        // console.log("CameraFeed: Skipping auto-capture, AI is analyzing.");
+    }
+  }, [internalStream, isAiAnalyzing, analysisIntervalMs, onFrameForAnalysis, isCameraActive]);
+
+
   useEffect(() => {
-    let currentStream: MediaStream | null = null; // To hold the stream for cleanup
+    let currentStream: MediaStream | null = null; 
 
     const startCamera = async () => {
       console.log("CameraFeed: Attempting to start camera.");
       setError(null);
       setIsLoading(true);
+      lastCaptureTimeRef.current = 0; // Reset last capture time
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-          currentStream = mediaStream; // Assign to local variable for cleanup
+          currentStream = mediaStream; 
           setInternalStream(mediaStream);
           console.log("CameraFeed: Camera stream obtained:", mediaStream.id);
           if (videoRef.current) {
             videoRef.current.srcObject = mediaStream;
-             // Attempt to play the video, especially on mobile Safari
             try {
               await videoRef.current.play();
               console.log("CameraFeed: videoRef.play() successful.");
             } catch (playError) {
-              console.warn("CameraFeed: videoRef.play() failed, browser might block autoplay:", playError);
-              // User interaction might be needed to start video in some browsers
-              toast({
-                title: "Info Kamera",
-                description: "Kamera dimulai, tetapi video mungkin memerlukan interaksi untuk diputar.",
-                variant: "default"
-              });
+              console.warn("CameraFeed: videoRef.play() failed:", playError);
             }
           }
           setIsLoading(false);
           if (onStarted) onStarted();
         } catch (err) {
           console.error("CameraFeed: Error accessing camera:", err);
-          const errorMessage = err instanceof Error ? err.message : "Unknown error accessing camera.";
-          const fullErrorMessage = `Gagal mengakses kamera: ${errorMessage}. Pastikan izin diberikan dan tidak ada aplikasi lain yang menggunakan kamera.`;
+          const errorMessage = err instanceof Error ? err.message : "Unknown error.";
+          const fullErrorMessage = `Gagal mengakses kamera: ${errorMessage}.`;
           setError(fullErrorMessage);
-          toast({
-            title: "Kesalahan Kamera",
-            description: `Gagal mengakses kamera. ${errorMessage}`,
-            variant: "destructive",
-          });
+          toast({ title: "Kesalahan Kamera", description: fullErrorMessage, variant: "destructive" });
           setIsLoading(false);
           if (onErrorOccurred) onErrorOccurred(fullErrorMessage);
-          setInternalStream(null); // Ensure internal stream is null on error
+          setInternalStream(null); 
         }
       } else {
         const unsupportedMessage = "Akses kamera tidak didukung oleh browser ini.";
-        console.log("CameraFeed:", unsupportedMessage);
         setError(unsupportedMessage);
-        toast({
-          title: "Browser Tidak Didukung",
-          description: unsupportedMessage,
-          variant: "destructive",
-        });
+        toast({ title: "Browser Tidak Didukung", description: unsupportedMessage, variant: "destructive" });
         setIsLoading(false);
         if (onErrorOccurred) onErrorOccurred(unsupportedMessage);
         setInternalStream(null);
@@ -100,86 +127,79 @@ const CameraFeed: FC<CameraFeedProps> = ({
 
     const stopCamera = () => {
       console.log("CameraFeed: Attempting to stop camera. Current internalStream:", internalStream?.id);
-      // Use the internalStream state for stopping
+      if (analysisIntervalRef.current) {
+        clearInterval(analysisIntervalRef.current);
+        analysisIntervalRef.current = null;
+        console.log("CameraFeed: Auto-analysis interval cleared due to camera stop.");
+      }
       if (internalStream) {
         stopCameraTracks(internalStream);
         setInternalStream(null);
       }
       if (videoRef.current) {
         videoRef.current.srcObject = null;
-        videoRef.current.pause(); // Explicitly pause
-        videoRef.current.load(); // Reset video element
+        videoRef.current.pause(); 
+        videoRef.current.load(); 
         console.log("CameraFeed: videoRef.srcObject set to null, paused, and loaded.");
       }
-      setIsLoading(false); // Ensure loading is false when stopped
+      setIsLoading(false); 
+      lastCaptureTimeRef.current = 0;
       if (onStopped) onStopped();
     };
 
     if (isCameraActive) {
-      if (!internalStream) { // Only start if not already active internally
+      if (!internalStream) { 
         startCamera();
       } else {
-        console.log("CameraFeed: Camera active, stream already exists.");
-        if (onStarted) onStarted(); // Call onStarted if already active and parent requests active state
+        if (onStarted) onStarted(); 
       }
     } else {
-      if (internalStream) { // Only stop if currently active internally
+      if (internalStream) { 
         stopCamera();
       } else {
-         console.log("CameraFeed: Camera inactive, no stream to stop.");
-         if (onStopped) onStopped(); // Call onStopped if already inactive and parent requests inactive state
+         if (onStopped) onStopped(); 
       }
     }
 
-    // Cleanup function
     return () => {
-      console.log("CameraFeed: useEffect cleanup. Stopping currentStream if any:", currentStream?.id);
-      stopCameraTracks(currentStream); // Stop tracks of the stream created in this effect instance
+      console.log("CameraFeed: useEffect cleanup. Stopping currentStream:", currentStream?.id);
+      if (analysisIntervalRef.current) {
+        clearInterval(analysisIntervalRef.current);
+        analysisIntervalRef.current = null;
+      }
+      stopCameraTracks(currentStream); 
       if (videoRef.current) {
-        videoRef.current.srcObject = null; // Ensure video source is cleared on unmount
-        console.log("CameraFeed: videoRef.srcObject cleared in cleanup.");
+        videoRef.current.srcObject = null;
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCameraActive, onStarted, onStopped, onErrorOccurred, toast, stopCameraTracks]); // internalStream removed from deps to avoid re-triggering, isCameraActive is the driver.
+  }, [isCameraActive]); // Removed other deps to control flow strictly by isCameraActive
 
-  const captureFrame = () => {
-    if (videoRef.current && internalStream && videoRef.current.readyState >= videoRef.current.HAVE_CURRENT_DATA) {
-      const videoElement = videoRef.current;
-      if (videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
-        console.warn("CameraFeed: CaptureFrame - video dimensions are zero.");
-        toast({ 
-          title: "Kesalahan Pengambilan", 
-          description: "Dimensi video tidak valid. Kamera mungkin belum sepenuhnya siap atau resolusi tidak terdeteksi.", 
-          variant: "destructive" 
-        });
-        return;
-      }
 
-      console.log(`CameraFeed: Capturing frame. Video dimensions: ${videoElement.videoWidth}x${videoElement.videoHeight}`);
-      const canvas = document.createElement('canvas');
-      canvas.width = videoElement.videoWidth;
-      canvas.height = videoElement.videoHeight;
-      const context = canvas.getContext('2d');
-      if (context) {
-        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-        const dataUri = canvas.toDataURL('image/jpeg', 0.9); 
-        onFrameCapture(dataUri);
-        console.log("CameraFeed: Frame captured and sent.");
-        toast({ title: "Frame Ditangkap", description: "Gambar dikirim untuk analisis." });
-      } else {
-         console.error("CameraFeed: CaptureFrame - Could not get canvas context.");
-         toast({ title: "Kesalahan Pengambilan", description: "Tidak dapat mengambil konteks kanvas.", variant: "destructive" });
+  useEffect(() => {
+    if (isCameraActive && internalStream && !isAiAnalyzing) {
+      if (!analysisIntervalRef.current) {
+        console.log(`CameraFeed: Starting auto-analysis interval (${analysisIntervalMs}ms).`);
+        // Initial capture attempt shortly after camera starts and AI is not busy
+        setTimeout(() => captureAndSendFrameForAnalysis(), 500); 
+        analysisIntervalRef.current = setInterval(captureAndSendFrameForAnalysis, analysisIntervalMs);
       }
     } else {
-      let reason = "Kamera belum siap atau tidak ada stream.";
-      if(videoRef.current && videoRef.current.readyState < videoRef.current.HAVE_CURRENT_DATA){
-        reason = `Kamera tidak memiliki cukup data (readyState: ${videoRef.current.readyState}). Coba lagi.`;
+      if (analysisIntervalRef.current) {
+        console.log("CameraFeed: Clearing auto-analysis interval (camera inactive, stream lost, or AI busy).");
+        clearInterval(analysisIntervalRef.current);
+        analysisIntervalRef.current = null;
       }
-      console.warn(`CameraFeed: CaptureFrame - Cannot capture. Reason: ${reason}`);
-      toast({ title: "Kesalahan Pengambilan", description: reason, variant: "destructive" });
     }
-  };
+    // Cleanup for this effect instance
+    return () => {
+      if (analysisIntervalRef.current) {
+        clearInterval(analysisIntervalRef.current);
+        analysisIntervalRef.current = null;
+      }
+    };
+  }, [isCameraActive, internalStream, captureAndSendFrameForAnalysis, analysisIntervalMs, isAiAnalyzing]);
+
 
   return (
     <div className="w-full h-full relative bg-black">
@@ -219,20 +239,7 @@ const CameraFeed: FC<CameraFeedProps> = ({
         </div>
       )}
 
-      {isCameraActive && internalStream && (
-        <div className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 flex space-x-3 sm:space-x-4 z-20">
-          <Button 
-            variant="default" 
-            size="lg" 
-            className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-full p-3 sm:p-4 shadow-xl"
-            onClick={captureFrame} 
-            disabled={!isCameraActive || isLoading} 
-            aria-label="Tangkap frame"
-          >
-            <Aperture className="h-6 w-6 sm:h-7 sm:w-7" />
-          </Button>
-        </div>
-      )}
+      {/* Manual capture button removed for automatic analysis */}
     </div>
   );
 };
