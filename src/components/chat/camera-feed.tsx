@@ -1,20 +1,20 @@
 'use client';
 
 import { useState, useRef, useEffect, type FC, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { Aperture, AlertCircle, VideoOff as VideoOffIconLucide, SwitchCamera } from 'lucide-react'; 
+import { Aperture, AlertCircle, VideoOff as VideoOffIconLucide, SwitchCamera } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import type { CameraFeedRefType } from '@/types';
 
 interface CameraFeedProps {
-  isCameraActive: boolean; 
+  isCameraActive: boolean;
   onStarted?: () => void;
   onStopped?: () => void;
   onErrorOccurred?: (errorMessage: string) => void;
 }
 
-const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({ 
+const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
   isCameraActive,
   onStarted,
   onStopped,
@@ -23,7 +23,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [internalStream, setInternalStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false); 
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const { toast } = useToast();
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean>(false);
@@ -65,19 +65,30 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
     }
   }, []);
 
-  const handleToggleFacingMode = useCallback(() => {
+  const handleToggleFacingMode = useCallback(async () => {
     if (isLoading) {
       console.log("CameraFeed: Camera is busy (isLoading is true), cannot toggle facing mode now.");
       return;
     }
 
+    setIsLoading(true); // Set loading state immediately
+    console.log("CameraFeed: Toggling facing mode - stopping existing stream first.");
+
+    // Stop existing stream
+    if (internalStream) {
+      stopCameraTracks(internalStream);
+      setInternalStream(null);
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    }
+
     setFacingMode(prevMode => {
       const newMode = prevMode === 'user' ? 'environment' : 'user';
-      console.log(`CameraFeed: Initiating facing mode toggle to ${newMode}.`);
-      setIsLoading(true);
+      console.log(`CameraFeed: Switching facing mode to ${newMode}`);
       return newMode;
     });
-  }, [isLoading]);
+  }, [isLoading, internalStream, stopCameraTracks]);
 
   useEffect(() => {
       const getCameraPermission = async () => {
@@ -100,17 +111,17 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
       };
 
       getCameraPermission();
-    }, []);
+    }, [toast]);
 
   useEffect(() => {
     // This ref holds the stream created in *this specific run* of the useEffect.
     // It's used by the cleanup function to ensure the correct stream is stopped.
-    let effectInstanceStream: MediaStream | null = null; 
+    let effectInstanceStream: MediaStream | null = null;
 
     const startCamera = async () => {
       console.log(`CameraFeed: Attempting to start camera with facingMode: ${facingMode}.`);
       setError(null);
-      setIsLoading(true); 
+      setIsLoading(true);
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode } });
@@ -120,11 +131,11 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
 
           if (videoRef.current) {
             videoRef.current.srcObject = mediaStream;
-            videoRef.current.onloadedmetadata = () => { 
+            videoRef.current.onloadedmetadata = () => {
                  console.log("CameraFeed: Video metadata loaded. Attempting to play.");
                  videoRef.current?.play().then(() => {
                     console.log("CameraFeed: videoRef.play() successful.");
-                    setIsLoading(false); 
+                    setIsLoading(false);
                     if (onStarted) onStarted();
                  }).catch((playError) => {
                     console.warn("CameraFeed: videoRef.play() failed:", playError);
@@ -132,7 +143,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
                     setError(playErrorMessage);
                     setIsLoading(false);
                     if (onErrorOccurred) onErrorOccurred(playErrorMessage);
-                    stopCameraTracks(mediaStream); 
+                    stopCameraTracks(mediaStream);
                     setInternalStream(null); // Clear stream state on error
                     effectInstanceStream = null; // Clear effect-local ref
                  });
@@ -164,7 +175,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
           toast({ title: "Kesalahan Kamera", description: fullErrorMessage, variant: "destructive" });
           setIsLoading(false);
           if (onErrorOccurred) onErrorOccurred(fullErrorMessage);
-          setInternalStream(null); 
+          setInternalStream(null);
           effectInstanceStream = null;
         }
       } else {
@@ -186,14 +197,14 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
       // For simplicity, using internalStream state here but cleanup function uses effectInstanceStream.
       const streamToActuallyStop = internalStream; // internalStream should be the one started by this effect cycle.
       console.log("CameraFeed: useEffect logic deciding to stop camera. Current internalStream:", streamToActuallyStop?.id);
-      if (streamToActuallyStop) { 
+      if (streamToActuallyStop) {
         stopCameraTracks(streamToActuallyStop);
-        setInternalStream(null); 
+        setInternalStream(null);
       }
       if (videoRef.current) {
         videoRef.current.srcObject = null;
-        videoRef.current.pause(); 
-        // videoRef.current.load(); // Calling load() after srcObject=null can help ensure it's fully cleared.
+        videoRef.current.pause();
+        // videoRef.current.load();
         console.log("CameraFeed: videoRef.srcObject set to null and paused.");
       }
       // Don't reset isLoading to false here if isCameraActive is true and we are just switching facingMode,
@@ -205,12 +216,12 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
       if (onStopped) onStopped();
     };
 
-    if (isCameraActive && hasCameraPermission) {
+    if (isCameraActive) {
       // If camera should be active, we need to ensure it's running with the current facingMode.
       // This will also handle re-starting if facingMode changed.
       console.log("CameraFeed: useEffect - Camera active, proceeding to start/ensure camera with current settings.");
       startCamera();
-    } else { 
+    } else {
       // If camera should not be active, ensure it's stopped.
       if (internalStream) { // Only stop if there's an active stream
         console.log("CameraFeed: useEffect - Camera inactive, stopping camera.");
@@ -219,7 +230,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
          console.log("CameraFeed: useEffect - Camera inactive, already stopped or never started.");
          // Ensure isLoading is false if we reach here and camera is meant to be off.
          setIsLoading(false);
-         if (onStopped) onStopped(); 
+         if (onStopped) onStopped();
       }
     }
 
@@ -227,26 +238,26 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
       // Cleanup function: This runs when dependencies (isCameraActive, facingMode) change,
       // or when the component unmounts. It stops the stream started by *this specific effect run*.
       console.log("CameraFeed: useEffect cleanup. Stopping effectInstanceStream:", effectInstanceStream?.id);
-      stopCameraTracks(effectInstanceStream); 
+      stopCameraTracks(effectInstanceStream);
       if (videoRef.current && videoRef.current.srcObject === effectInstanceStream && effectInstanceStream !== null) {
         videoRef.current.srcObject = null;
         videoRef.current.pause();
-        // videoRef.current.load(); 
+        // videoRef.current.load();
       }
       // Reset internalStream if it was the one we are cleaning up.
       // This helps if the component unmounts while a stream was active.
       setInternalStream(current => current === effectInstanceStream ? null : current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps 
-  }, [isCameraActive, facingMode, hasCameraPermission]); // Rerun effect if isCameraActive or facingMode changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCameraActive, facingMode]);
 
   return (
     <div className="w-full h-full relative bg-black">
-      <video 
-        ref={videoRef} 
-        autoPlay 
-        playsInline 
-        muted 
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
         className={`w-full h-full object-cover ${isCameraActive && internalStream && !isLoading && hasCameraPermission ? 'block' : 'hidden'}`}
         onLoadedData={() => console.log("CameraFeed: Video data loaded.")}
         onCanPlay={() => console.log("CameraFeed: Video can play.")}
@@ -265,20 +276,20 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
         </Button>
       )}
 
-      {!isCameraActive && !error && !isLoading && ( 
+      {!isCameraActive && !error && !isLoading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 text-white p-4">
           <VideoOffIconLucide size={64} className="mb-4 opacity-70"/>
           <p className="text-xl font-semibold">Kamera Mati</p>
           <p className="text-sm opacity-80 mt-1 text-center">Gunakan tombol kamera di panel obrolan untuk memulai.</p>
         </div>
       )}
-      {isLoading && ( 
-         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 text-white z-20"> 
+      {isLoading && (
+         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 text-white z-20">
           <Aperture size={64} className="animate-spin mb-4 opacity-70"/>
           <p className="text-xl font-semibold">Mengakses Kamera...</p>
         </div>
       )}
-       {error && !isLoading && ( 
+       {error && !isLoading && (
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 sm:top-auto sm:bottom-1/3 p-4 flex justify-center z-30">
             <Alert variant="destructive" className="max-w-md bg-destructive/90 text-destructive-foreground border-destructive-foreground/50 shadow-2xl">
               <AlertCircle className="h-5 w-5" />
