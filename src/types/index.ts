@@ -9,4 +9,5 @@ export interface ChatMessageData {
 
 export interface CameraFeedRefType {
   captureCurrentFrame: () => string | null;
+  toggleFacingMode: () => void; // Added method to toggle camera facing mode
 }

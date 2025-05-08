@@ -5,7 +5,7 @@ import { useState, type FC, type FormEvent, useEffect, useRef }
 from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Send, Loader2, Video, VideoOff, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
+import { Send, Loader2, Video, VideoOff, Mic, MicOff, Volume2, VolumeX, SwitchCamera } from 'lucide-react'; // Added SwitchCamera
 import { useToast } from '@/hooks/use-toast';
 
 interface ChatInputProps {
@@ -14,6 +14,7 @@ interface ChatInputProps {
   isCameraActive: boolean;
   isCameraProcessing: boolean; // Specifically for camera hardware start/stop
   onToggleCamera: () => void;
+  onToggleFacingMode: () => void; // Added prop for toggling facing mode
   isTtsEnabled: boolean;
   onToggleTts: () => void;
   stopSpeaking: () => void;
@@ -25,6 +26,7 @@ const ChatInput: FC<ChatInputProps> = ({
   isCameraActive,
   isCameraProcessing, 
   onToggleCamera,
+  onToggleFacingMode, // Consumed prop
   isTtsEnabled,
   onToggleTts,
   stopSpeaking,
@@ -164,6 +166,17 @@ const ChatInput: FC<ChatInputProps> = ({
         aria-label={isCameraActive ? "Matikan kamera" : "Nyalakan kamera"}
       >
         {isCameraProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : isCameraActive ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        className="rounded-full border-white/30 bg-white/20 hover:bg-white/30 text-white"
+        onClick={onToggleFacingMode}
+        disabled={isLoading || isRecording || !isCameraActive} // Disable if camera not active
+        aria-label="Ganti Kamera"
+      >
+        <SwitchCamera className="h-5 w-5" />
       </Button>
        <Button
         type="button"

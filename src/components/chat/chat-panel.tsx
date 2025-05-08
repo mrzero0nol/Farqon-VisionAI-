@@ -152,6 +152,12 @@ const ChatPanel: FC<ChatPanelProps> = ({
     });
   };
 
+  const handleToggleFacingMode = useCallback(() => {
+    if (cameraFeedRef.current?.toggleFacingMode) {
+      cameraFeedRef.current.toggleFacingMode();
+    }
+  }, [cameraFeedRef]);
+
   return (
     <div className={cn("w-full flex flex-col overflow-hidden", className)}>
       {showChatBubbles ? (
@@ -169,6 +175,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
         isCameraActive={isCameraActive}
         isCameraProcessing={isCameraProcessing}
         onToggleCamera={onToggleCamera}
+        onToggleFacingMode={handleToggleFacingMode} // Pass the handler
         isTtsEnabled={isTtsEnabled}
         onToggleTts={toggleTts}
         stopSpeaking={stopSpeaking}
@@ -178,4 +185,3 @@ const ChatPanel: FC<ChatPanelProps> = ({
 };
 
 export default ChatPanel;
-
