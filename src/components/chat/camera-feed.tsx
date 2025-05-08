@@ -119,7 +119,7 @@ const CameraFeed: FC<CameraFeedProps> = ({
       const context = canvas.getContext('2d');
       if (context) {
         context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const dataUri = canvas.toDataURL('image/jpeg');
+        const dataUri = canvas.toDataURL('image/jpeg', 1.0); // Set JPEG quality to maximum
         onFrameCapture(dataUri);
         toast({ title: "Frame Captured", description: "Image sent for analysis." });
       } else {
