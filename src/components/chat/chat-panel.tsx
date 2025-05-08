@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useEffect, type FC, useCallback } from 'react';
@@ -7,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { ChatMessageData, CameraFeedRefType } from '@/types';
 import { contextualChatWithVision } from '@/ai/flows';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface ChatPanelProps {
   cameraFeedRef: React.RefObject<CameraFeedRefType>;
@@ -15,6 +17,7 @@ interface ChatPanelProps {
   onToggleCamera: () => void;
   isAiAnalyzing: boolean; // AI model processing
   setIsAiAnalyzing: (isAnalyzing: boolean) => void;
+  className?: string; // Added className prop
 }
 
 const ChatPanel: FC<ChatPanelProps> = ({
@@ -24,6 +27,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
   onToggleCamera,
   isAiAnalyzing,
   setIsAiAnalyzing,
+  className, // Destructure className
 }) => {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [isTtsEnabled, setIsTtsEnabled] = useState(true);
@@ -72,18 +76,6 @@ const ChatPanel: FC<ChatPanelProps> = ({
       };
     }
   }, []);
-
-  // Removed useEffect that scrolled to bottom. With messages prepended,
-  // the default scroll position (top) is desired.
-  // useEffect(() => {
-  //   if (chatContentRef.current) {
-  //     setTimeout(() => {
-  //       if (chatContentRef.current) {
-  //         chatContentRef.current.scrollTop = chatContentRef.current.scrollHeight;
-  //       }
-  //     }, 0);
-  //   }
-  // }, [messages]);
   
   const handleSendMessage = useCallback(async (userQuestion: string) => {
     stopSpeaking();
@@ -110,7 +102,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
     }
     
     const userMessageId = Date.now().toString();
-    addMessage({ id: userMessageId, role: 'user', content: userQuestion, image: imageDataUri }); // Image is not displayed per previous request, but kept in data
+    addMessage({ id: userMessageId, role: 'user', content: userQuestion, image: imageDataUri });
     
     try {
       console.log("ChatPanel: Sending user question with live camera frame to AI.");
@@ -142,7 +134,8 @@ const ChatPanel: FC<ChatPanelProps> = ({
   };
 
   return (
-    <div className="w-full flex flex-col overflow-hidden max-h-[45vh] sm:max-h-[40vh]">
+    // Removed max-h properties, using className for height control (e.g., h-full from parent)
+    <div className={cn("w-full flex flex-col overflow-hidden", className)}>
       <ScrollArea className="flex-grow p-3 sm:p-4">
         <div ref={chatContentRef} className="space-y-3">
           {messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)}

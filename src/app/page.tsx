@@ -42,7 +42,7 @@ export default function VisionAIChatPage() {
 
 
   return (
-    <div className="relative min-h-screen bg-background font-sans">
+    <div className="relative min-h-screen bg-background font-sans overflow-hidden"> {/* Added overflow-hidden to body container */}
       <div className="fixed inset-0 z-0">
         <CameraFeed 
           ref={cameraFeedRef}
@@ -53,8 +53,9 @@ export default function VisionAIChatPage() {
         />
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-2 sm:p-4 z-10">
-        <div className="max-w-2xl mx-auto">
+      {/* Modified wrapper for ChatPanel to allow it to fill more screen height */}
+      <div className="fixed inset-x-0 top-0 bottom-0 p-2 sm:p-4 z-10 flex flex-col">
+        <div className="max-w-2xl mx-auto w-full flex flex-col h-full"> {/* This container allows ChatPanel to use h-full */}
           <ChatPanel 
             cameraFeedRef={cameraFeedRef}
             isCameraActive={isCameraActive} 
@@ -62,6 +63,7 @@ export default function VisionAIChatPage() {
             onToggleCamera={handleToggleCamera}
             isAiAnalyzing={isAiAnalyzing}
             setIsAiAnalyzing={setIsAiAnalyzing}
+            className="h-full" // Pass h-full to ChatPanel
           />
         </div>
       </div>
