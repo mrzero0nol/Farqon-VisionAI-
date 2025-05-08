@@ -21,7 +21,7 @@ const AnalyzeCameraFeedInputSchema = z.object({
 export type AnalyzeCameraFeedInput = z.infer<typeof AnalyzeCameraFeedInputSchema>;
 
 const AnalyzeCameraFeedOutputSchema = z.object({
-  summary: z.string().describe('A comprehensive and detailed description of what the AI sees in the camera feed, covering objects, their attributes, spatial relationships, people, background, and overall context.'),
+  summary: z.string().describe('Deskripsi yang komprehensif dan mendetail tentang apa yang dilihat AI di umpan kamera, mencakup objek, atributnya, hubungan spasial, orang, latar belakang, dan konteks keseluruhan.'),
 });
 export type AnalyzeCameraFeedOutput = z.infer<typeof AnalyzeCameraFeedOutputSchema>;
 
@@ -33,18 +33,18 @@ const analyzeCameraFeedPrompt = ai.definePrompt({
   name: 'analyzeCameraFeedPrompt',
   input: {schema: AnalyzeCameraFeedInputSchema},
   output: {schema: AnalyzeCameraFeedOutputSchema},
-  prompt: `You are a highly perceptive AI visual analysis expert. Your task is to meticulously examine the provided image from a camera feed and generate a detailed, accurate description.
+  prompt: `Anda adalah seorang ahli analisis visual AI yang sangat perseptif. Tugas Anda adalah memeriksa dengan cermat gambar yang disediakan dari umpan kamera dan menghasilkan deskripsi yang detail dan akurat.
 
-Focus on:
-1.  **Object Identification:** Clearly identify all prominent objects. For each object, mention its type, and if discernible, its color, material, or any significant features.
-2.  **Spatial Relationships:** Describe where objects are located in relation to each other and the overall scene (e.g., "a red_mug is on_the_table", "a_cat_is_under_the_chair").
-3.  **People (if present):** Describe their apparent number, general actions or poses (e.g., "one person sitting", "two people walking"). Avoid guessing identities or making assumptions about emotions unless very obvious.
-4.  **Background and Environment:** Describe the setting (e.g., "an office room", "an outdoor park scene"), including significant background elements.
-5.  **Overall Scene Context:** Provide a brief summary of what is happening or depicted in the image as a whole.
+Fokus pada:
+1.  **Identifikasi Objek:** Identifikasi dengan jelas semua objek yang menonjol. Untuk setiap objek, sebutkan jenisnya, dan jika dapat dilihat, warna, bahan, atau fitur penting lainnya.
+2.  **Hubungan Spasial:** Jelaskan di mana objek berada dalam kaitannya satu sama lain dan keseluruhan pemandangan (misalnya, "cangkir_merah ada di_atas_meja", "kucing_ada_di_bawah_kursi").
+3.  **Orang (jika ada):** Jelaskan perkiraan jumlah mereka, tindakan umum atau pose (misalnya, "satu orang duduk", "dua orang berjalan"). Hindari menebak identitas atau membuat asumsi tentang emosi kecuali sangat jelas.
+4.  **Latar Belakang dan Lingkungan:** Jelaskan latarnya (misalnya, "ruang kantor", "pemandangan taman luar ruangan"), termasuk elemen latar belakang yang signifikan.
+5.  **Konteks Pemandangan Keseluruhan:** Berikan ringkasan singkat tentang apa yang terjadi atau digambarkan dalam gambar secara keseluruhan.
 
-Strive for factual accuracy and comprehensive coverage. If an object is unclear or ambiguous, you can state that. Your goal is to provide a rich textual representation of the visual input.
-
-Image: {{media url=photoDataUri}}`,
+Berusahalah untuk akurasi faktual dan cakupan yang komprehensif. Jika suatu objek tidak jelas atau ambigu, Anda dapat menyatakannya. Tujuan Anda adalah memberikan representasi tekstual yang kaya dari input visual.
+Harap berikan jawaban Anda dalam Bahasa Indonesia.
+Gambar: {{media url=photoDataUri}}`,
 });
 
 const analyzeCameraFeedFlow = ai.defineFlow(
@@ -58,3 +58,4 @@ const analyzeCameraFeedFlow = ai.defineFlow(
     return output!;
   }
 );
+

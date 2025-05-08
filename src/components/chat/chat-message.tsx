@@ -43,7 +43,7 @@ const ChatMessage: FC<ChatMessageProps> = ({ message }) => {
             <CardContent className="p-1">
              <Image 
                 src={message.image} 
-                alt="User submission" 
+                alt="Gambar kiriman" 
                 width={200} 
                 height={150} 
                 className="rounded-md object-cover"
@@ -65,3 +65,4 @@ const ChatMessage: FC<ChatMessageProps> = ({ message }) => {
 };
 
 export default ChatMessage;
+

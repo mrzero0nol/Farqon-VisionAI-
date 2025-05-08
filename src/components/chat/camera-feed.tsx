@@ -42,11 +42,11 @@ const CameraFeed: FC<CameraFeedProps> = ({
       } catch (err) {
         console.error("Error accessing camera:", err);
         const errorMessage = err instanceof Error ? err.message : "Unknown error accessing camera.";
-        const fullErrorMessage = `Failed to access camera: ${errorMessage}. Please ensure permissions are granted and no other app is using the camera.`;
+        const fullErrorMessage = `Gagal mengakses kamera: ${errorMessage}. Pastikan izin diberikan dan tidak ada aplikasi lain yang menggunakan kamera.`;
         setError(fullErrorMessage);
         toast({
-          title: "Camera Error",
-          description: `Failed to access camera. ${errorMessage}`,
+          title: "Kesalahan Kamera",
+          description: `Gagal mengakses kamera. ${errorMessage}`,
           variant: "destructive",
         });
         if (onErrorOccurred) onErrorOccurred(fullErrorMessage);
@@ -54,10 +54,10 @@ const CameraFeed: FC<CameraFeedProps> = ({
         setIsLoading(false);
       }
     } else {
-      const unsupportedMessage = "Camera access not supported by this browser.";
+      const unsupportedMessage = "Akses kamera tidak didukung oleh browser ini.";
       setError(unsupportedMessage);
       toast({
-        title: "Unsupported Browser",
+        title: "Browser Tidak Didukung",
         description: unsupportedMessage,
         variant: "destructive",
       });
@@ -121,12 +121,12 @@ const CameraFeed: FC<CameraFeedProps> = ({
         context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
         const dataUri = canvas.toDataURL('image/jpeg', 1.0); // Set JPEG quality to maximum
         onFrameCapture(dataUri);
-        toast({ title: "Frame Captured", description: "Image sent for analysis." });
+        toast({ title: "Frame Ditangkap", description: "Gambar dikirim untuk analisis." });
       } else {
-         toast({ title: "Capture Error", description: "Could not get canvas context.", variant: "destructive" });
+         toast({ title: "Kesalahan Pengambilan", description: "Tidak dapat mengambil konteks kanvas.", variant: "destructive" });
       }
     } else {
-      toast({ title: "Capture Error", description: "Camera not ready or no stream.", variant: "destructive" });
+      toast({ title: "Kesalahan Pengambilan", description: "Kamera belum siap atau tidak ada stream.", variant: "destructive" });
     }
   };
 
@@ -137,21 +137,21 @@ const CameraFeed: FC<CameraFeedProps> = ({
       {!isCameraActive && !error && !isLoading && ( // Show if camera is off, no error, not loading to start
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 text-white p-4">
           <VideoOffIconLucide size={64} className="mb-4 opacity-70"/>
-          <p className="text-xl font-semibold">Camera is Off</p>
-          <p className="text-sm opacity-80 mt-1 text-center">Use the camera button in the chat panel to start.</p>
+          <p className="text-xl font-semibold">Kamera Mati</p>
+          <p className="text-sm opacity-80 mt-1 text-center">Gunakan tombol kamera di panel obrolan untuk memulai.</p>
         </div>
       )}
       {isLoading && ( // Show when startCameraInternal is running
          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 text-white">
           <Aperture size={64} className="animate-spin mb-4 opacity-70"/>
-          <p className="text-xl font-semibold">Accessing Camera...</p>
+          <p className="text-xl font-semibold">Mengakses Kamera...</p>
         </div>
       )}
        {error && !isLoading && ( // Show error if not currently trying to load (isLoading is for start process)
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 sm:top-auto sm:bottom-1/3 p-4 flex justify-center z-30">
             <Alert variant="destructive" className="max-w-md bg-destructive/90 text-destructive-foreground border-destructive-foreground/50 shadow-2xl">
               <AlertCircle className="h-5 w-5" />
-              <AlertTitle className="font-bold">Camera Access Error</AlertTitle>
+              <AlertTitle className="font-bold">Kesalahan Akses Kamera</AlertTitle>
               <AlertDescription>
                 {error}
               </AlertDescription>
@@ -168,7 +168,7 @@ const CameraFeed: FC<CameraFeedProps> = ({
             className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-full p-3 sm:p-4 shadow-xl"
             onClick={captureFrame} 
             disabled={!isCameraActive || isLoading} 
-            aria-label="Capture frame"
+            aria-label="Tangkap frame"
           >
             <Aperture className="h-6 w-6 sm:h-7 sm:w-7" />
           </Button>
@@ -179,3 +179,4 @@ const CameraFeed: FC<CameraFeedProps> = ({
 };
 
 export default CameraFeed;
+

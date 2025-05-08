@@ -24,7 +24,7 @@ export type ContextualChatWithVisionInput = z.infer<
 >;
 
 const ContextualChatWithVisionOutputSchema = z.object({
-  answer: z.string().describe('The answer to the question.'),
+  answer: z.string().describe('Jawaban atas pertanyaan tersebut.'),
 });
 export type ContextualChatWithVisionOutput = z.infer<
   typeof ContextualChatWithVisionOutputSchema
@@ -40,12 +40,13 @@ const prompt = ai.definePrompt({
   name: 'contextualChatWithVisionPrompt',
   input: {schema: ContextualChatWithVisionInputSchema},
   output: {schema: ContextualChatWithVisionOutputSchema},
-  prompt: `You are an intelligent chatbot that can see and answer questions about images.
+  prompt: `Anda adalah chatbot cerdas yang dapat melihat dan menjawab pertanyaan tentang gambar.
 
-  A user has provided you with an image from their camera, and is asking you a question about it.
-  Use the image to answer their question as accurately as possible.
+  Seorang pengguna telah memberi Anda gambar dari kamera mereka, dan mengajukan pertanyaan tentangnya.
+  Gunakan gambar tersebut untuk menjawab pertanyaan mereka seakurat mungkin.
+  Harap berikan jawaban Anda dalam Bahasa Indonesia.
 
-  Question: {{{question}}}
+  Pertanyaan: {{{question}}}
   Image: {{media url=photoDataUri}}
   `,
 });
@@ -61,3 +62,4 @@ const contextualChatWithVisionFlow = ai.defineFlow(
     return output!;
   }
 );
+

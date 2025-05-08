@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Farqon VisionAI',
-  description: 'AI Chatbot with Camera Interaction by Firebase Studio',
+  description: 'Chatbot AI dengan Interaksi Kamera oleh Firebase Studio',
 };
 
 export default function RootLayout({
@@ -24,7 +24,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="id">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
         <Toaster />
@@ -32,3 +32,4 @@ export default function RootLayout({
     </html>
   );
 }
+

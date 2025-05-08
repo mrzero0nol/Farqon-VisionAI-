@@ -95,20 +95,20 @@ const ChatPanel: FC<ChatPanelProps> = ({
   const handleAnalyzeFrame = async (imageDataUri: string) => {
     setIsLoading(true);
     stopSpeaking();
-    addMessage({ id: Date.now().toString() + 'img-prompt', role: 'user', content: 'What do you see in this image?', image: imageDataUri });
+    addMessage({ id: Date.now().toString() + 'img-prompt', role: 'user', content: 'Apa yang Anda lihat di gambar ini?', image: imageDataUri });
     try {
       const response = await analyzeCameraFeed({ photoDataUri: imageDataUri });
       addMessage({ id: Date.now().toString(), role: 'assistant', content: response.summary });
       if (response.summary) speakText(response.summary);
     } catch (error) {
       console.error("Error analyzing camera feed:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-      const aiErrorMsg = `Sorry, I encountered an error: ${errorMessage}`;
+      const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui.";
+      const aiErrorMsg = `Maaf, saya mengalami kesalahan: ${errorMessage}`;
       addMessage({ id: Date.now().toString(), role: 'assistant', content: aiErrorMsg, isError: true });
       speakText(aiErrorMsg);
       toast({
-        title: "AI Analysis Error",
-        description: `Failed to analyze image. ${errorMessage}`,
+        title: "Kesalahan Analisis AI",
+        description: `Gagal menganalisis gambar. ${errorMessage}`,
         variant: "destructive",
       });
     } finally {
@@ -120,12 +120,12 @@ const ChatPanel: FC<ChatPanelProps> = ({
     stopSpeaking();
     if (!capturedFrame && !isCameraActive) {
       toast({
-        title: "No Image Context",
-        description: "Please start the camera and capture a frame, or ensure a frame was recently captured to ask questions about.",
+        title: "Tidak Ada Konteks Gambar",
+        description: "Silakan mulai kamera dan tangkap frame, atau pastikan frame baru saja ditangkap untuk bertanya tentangnya.",
         variant: "destructive"
       });
       addMessage({ id: Date.now().toString() + '-user-error', role: 'user', content: userQuestion });
-      const aiErrorMsg = "I need an image to 'see'. Please activate the camera and capture a frame first.";
+      const aiErrorMsg = "Saya membutuhkan gambar untuk 'melihat'. Harap aktifkan kamera dan tangkap frame terlebih dahulu.";
       addMessage({ id: Date.now().toString() + '-ai-error', role: 'assistant', content: aiErrorMsg, isError: true });
       speakText(aiErrorMsg);
       return;
@@ -137,12 +137,12 @@ const ChatPanel: FC<ChatPanelProps> = ({
     setIsLoading(true);
 
     if (!imageToSend && isCameraActive) {
-      const aiMsg = "I don't have a specific image for this question. Please capture a frame if you want me to analyze something new. I will try to answer based on general knowledge or previous context if any.";
+      const aiMsg = "Saya tidak memiliki gambar spesifik untuk pertanyaan ini. Harap tangkap frame jika Anda ingin saya menganalisis sesuatu yang baru. Saya akan mencoba menjawab berdasarkan pengetahuan umum atau konteks sebelumnya jika ada.";
       addMessage({ id: Date.now().toString() + '-no-img', role: 'assistant', content: aiMsg });
       speakText(aiMsg);
       toast({
-        title: "No Image for Question",
-        description: "Please capture a frame to ask about specific visual content.",
+        title: "Tidak Ada Gambar untuk Pertanyaan",
+        description: "Harap tangkap frame untuk bertanya tentang konten visual tertentu.",
         variant: "warning"
       });
       setIsLoading(false);
@@ -150,7 +150,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
     }
 
     if (!imageToSend && !isCameraActive) {
-      const aiErrorMsg = "I can't see anything right now. Please start the camera and capture an image.";
+      const aiErrorMsg = "Saya tidak bisa melihat apa pun saat ini. Harap mulai kamera dan tangkap gambar.";
       addMessage({ id: Date.now().toString() + '-critical-no-img', role: 'assistant', content: aiErrorMsg, isError: true });
       speakText(aiErrorMsg);
       setIsLoading(false);
@@ -164,20 +164,20 @@ const ChatPanel: FC<ChatPanelProps> = ({
         if(response.answer) speakText(response.answer);
       } catch (error) {
         console.error("Error in contextual chat:", error);
-        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-        const aiErrorMsg = `Sorry, I encountered an error: ${errorMessage}`;
+        const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui.";
+        const aiErrorMsg = `Maaf, saya mengalami kesalahan: ${errorMessage}`;
         addMessage({ id: Date.now().toString(), role: 'assistant', content: aiErrorMsg, isError: true });
         speakText(aiErrorMsg);
         toast({
-          title: "AI Chat Error",
-          description: `Failed to get response. ${errorMessage}`,
+          title: "Kesalahan Obrolan AI",
+          description: `Gagal mendapatkan respons. ${errorMessage}`,
           variant: "destructive",
         });
       } finally {
         setIsLoading(false);
       }
     } else {
-      const aiErrorMsg = "I don't have an image to reference for your question. Please capture a frame.";
+      const aiErrorMsg = "Saya tidak memiliki gambar untuk dirujuk untuk pertanyaan Anda. Harap tangkap frame.";
       addMessage({ id: Date.now().toString() + '-fallback-no-img', role: 'assistant', content: aiErrorMsg, isError: true });
       speakText(aiErrorMsg);
       setIsLoading(false);

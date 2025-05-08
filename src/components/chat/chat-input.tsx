@@ -73,8 +73,8 @@ const ChatInput: FC<ChatInputProps> = ({
         recognitionInstance.onerror = (event: any) => {
           console.error('Speech recognition error:', event.error);
           toast({
-            title: 'Voice Error',
-            description: `Speech recognition error: ${event.error === 'no-speech' ? 'No speech detected.' : event.error === 'not-allowed' ? 'Microphone access denied.' : event.error}`,
+            title: 'Kesalahan Suara',
+            description: `Kesalahan pengenalan ucapan: ${event.error === 'no-speech' ? 'Tidak ada ucapan terdeteksi.' : event.error === 'not-allowed' ? 'Akses mikrofon ditolak.' : event.error}`,
             variant: 'destructive',
           });
           setIsRecording(false); // Ensure recording state is reset on error
@@ -101,7 +101,7 @@ const ChatInput: FC<ChatInputProps> = ({
   const handleMicClick = () => {
     stopSpeaking(); // Stop any ongoing TTS
     if (!speechRecognitionRef.current) {
-      toast({ title: "Voice Input Not Supported", description: "Your browser does not support speech recognition.", variant: "destructive" });
+      toast({ title: "Input Suara Tidak Didukung", description: "Browser Anda tidak mendukung pengenalan ucapan.", variant: "destructive" });
       return;
     }
 
@@ -115,7 +115,7 @@ const ChatInput: FC<ChatInputProps> = ({
         setIsRecording(true);
       } catch (error) {
         console.error("Error starting speech recognition:", error);
-        toast({ title: "Voice Error", description: "Could not start voice input.", variant: "destructive" });
+        toast({ title: "Kesalahan Suara", description: "Tidak dapat memulai input suara.", variant: "destructive" });
         setIsRecording(false); // Reset if start fails
       }
     }
@@ -144,13 +144,13 @@ const ChatInput: FC<ChatInputProps> = ({
     >
       <Input
         type="text"
-        placeholder={isRecording ? "Listening..." : "Ask about what the camera sees..."}
+        placeholder={isRecording ? "Mendengarkan..." : "Tanyakan tentang apa yang dilihat kamera..."}
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         className="flex-grow rounded-full focus-visible:ring-accent bg-white/20 placeholder-white/70 text-white border-white/30"
         disabled={commonDisabled}
         readOnly={isRecording}
-        aria-label="Chat message input"
+        aria-label="Input pesan obrolan"
       />
       <Button
         type="button"
@@ -159,7 +159,7 @@ const ChatInput: FC<ChatInputProps> = ({
         className="rounded-full border-white/30 bg-white/20 hover:bg-white/30 text-white"
         onClick={handleMicClick}
         disabled={commonDisabled}
-        aria-label={isRecording ? "Stop recording" : "Start recording"}
+        aria-label={isRecording ? "Hentikan perekaman" : "Mulai perekaman"}
       >
         {isRecording ? <MicOff className="h-5 w-5 text-destructive" /> : <Mic className="h-5 w-5" />}
       </Button>
@@ -170,7 +170,7 @@ const ChatInput: FC<ChatInputProps> = ({
         className="rounded-full border-white/30 bg-white/20 hover:bg-white/30 text-white"
         onClick={onToggleCamera}
         disabled={commonDisabled || isRecording} // Disable camera toggle while recording
-        aria-label={isCameraActive ? "Turn off camera" : "Turn on camera"}
+        aria-label={isCameraActive ? "Matikan kamera" : "Nyalakan kamera"}
       >
         {isCameraProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : isCameraActive ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
       </Button>
@@ -184,7 +184,7 @@ const ChatInput: FC<ChatInputProps> = ({
           if (isTtsEnabled) stopSpeaking(); // If turning off, stop current speech
         }}
         disabled={commonDisabled}
-        aria-label={isTtsEnabled ? "Disable AI voice" : "Enable AI voice"}
+        aria-label={isTtsEnabled ? "Nonaktifkan suara AI" : "Aktifkan suara AI"}
       >
         {isTtsEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
       </Button>
@@ -193,7 +193,7 @@ const ChatInput: FC<ChatInputProps> = ({
         size="icon"
         className="rounded-full bg-accent hover:bg-accent/90 text-accent-foreground"
         disabled={commonDisabled || !inputValue.trim()} // Disable send if input is empty OR commonDisabled
-        aria-label="Send message"
+        aria-label="Kirim pesan"
       >
         {isLoading && !isCameraProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
       </Button>
@@ -202,3 +202,4 @@ const ChatInput: FC<ChatInputProps> = ({
 };
 
 export default ChatInput;
+
