@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useEffect, type FC, useCallback, useImperativeHandle, forwardRef } from 'react';
@@ -280,4 +279,3 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
 
 CameraFeed.displayName = 'CameraFeed';
 export default CameraFeed;
-
