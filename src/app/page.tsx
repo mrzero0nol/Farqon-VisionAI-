@@ -50,6 +50,7 @@ export default function VisionAIChatPage() {
           onStarted={handleCameraStarted}
           onStopped={handleCameraStopped}
           onErrorOccurred={handleCameraError}
+          isCameraProcessing={isCameraProcessing} // Pass down the processing state
         />
       </div>
 
@@ -70,3 +71,4 @@ export default function VisionAIChatPage() {
     </div>
   );
 }
+
