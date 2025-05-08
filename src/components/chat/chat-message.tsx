@@ -1,12 +1,10 @@
 'use client';
 
 import type { FC } from 'react';
-import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Bot, User, AlertTriangleIcon } from 'lucide-react';
 import type { ChatMessageData } from '@/types';
-import { Card, CardContent } from '@/components/ui/card';
 
 interface ChatMessageProps {
   message: ChatMessageData;
@@ -38,20 +36,7 @@ const ChatMessage: FC<ChatMessageProps> = ({ message }) => {
         )}
       >
         <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-        {message.image && (
-          <Card className="mt-2 overflow-hidden bg-white/10 border-none backdrop-filter backdrop-blur-sm">
-            <CardContent className="p-1">
-             <Image 
-                src={message.image} 
-                alt="Gambar kiriman" 
-                width={200} 
-                height={150} 
-                className="rounded-md object-cover"
-                data-ai-hint="captured image"
-              />
-            </CardContent>
-          </Card>
-        )}
+        {/* Image display removed as per user request */}
       </div>
       {isUser && (
         <Avatar className="h-8 w-8 shrink-0">
@@ -65,4 +50,3 @@ const ChatMessage: FC<ChatMessageProps> = ({ message }) => {
 };
 
 export default ChatMessage;
-
