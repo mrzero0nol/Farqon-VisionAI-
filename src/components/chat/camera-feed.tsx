@@ -66,40 +66,41 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
   }, []);
 
   const handleToggleFacingMode = useCallback(() => {
-    if (!isCameraActive && !isLoading) { // Only allow toggle if camera is off or not in middle of an operation
-      setFacingMode(prevMode => {
-        const newMode = prevMode === 'user' ? 'environment' : 'user';
-        console.log(`CameraFeed: FacingMode set to ${newMode} (camera off)`);
-        return newMode;
-      });
-      return;
+    // This guard: if camera is off AND not loading, OR camera is ON and IS loading.
+    if ((!isCameraActive && !isLoading) || (isCameraActive && isLoading)) {
+      if (!isCameraActive && !isLoading) { // If camera is off, just change the mode for next start
+        setFacingMode(prevMode => {
+          const newMode = prevMode === 'user' ? 'environment' : 'user';
+          console.log(`CameraFeed: FacingMode set to ${newMode} (camera will use this when next started)`);
+          return newMode;
+        });
+      } else { // (isCameraActive && isLoading)
+        console.log("CameraFeed: Camera is busy, cannot toggle facing mode now.");
+      }
+      return; // Exit if camera is off (mode set for next time) OR if camera is busy.
     }
 
-    if (isLoading) { // Prevent rapid toggling while camera is starting/stopping
-        console.log("CameraFeed: Camera is busy, cannot toggle facing mode now.");
-        return;
-    }
-    
-    console.log("CameraFeed: Toggling facing mode. Current stream:", internalStream?.id);
-    setIsLoading(true); // Indicate camera operation
-    
-    // Stop current stream before changing mode
+    // This part executes ONLY if isCameraActive is TRUE and isLoading is FALSE.
+    // This is the scenario for switching an *active, non-busy* camera.
+    console.log("CameraFeed: Toggling facing mode while camera is active. Current stream:", internalStream?.id);
+    setIsLoading(true); // Indicate camera operation is starting.
+
     if (internalStream) {
-      stopCameraTracks(internalStream);
-      setInternalStream(null); 
+      stopCameraTracks(internalStream); // Stop current video tracks.
+      setInternalStream(null); // Clear the state for the stream.
       if (videoRef.current) {
-        videoRef.current.srcObject = null;
-        videoRef.current.pause();
-        videoRef.current.load();
+        videoRef.current.pause(); // Explicitly pause video element
+        videoRef.current.srcObject = null; // Detach stream from video element.
       }
     }
-    
+
+    // Update facingMode state. This will trigger the useEffect.
     setFacingMode(prevMode => {
       const newMode = prevMode === 'user' ? 'environment' : 'user';
       console.log(`CameraFeed: FacingMode will change to ${newMode}. useEffect will restart camera.`);
       return newMode;
     });
-    // The useEffect hook, now dependent on facingMode, will call startCamera.
+    // useEffect listening to 'facingMode' will now take over and call 'startCamera'.
   }, [isCameraActive, internalStream, stopCameraTracks, isLoading]);
 
 
@@ -109,7 +110,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
     const startCamera = async () => {
       console.log(`CameraFeed: Attempting to start camera with facingMode: ${facingMode}.`);
       setError(null);
-      setIsLoading(true); // Moved to ensure it's set before async operations
+      setIsLoading(true); 
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
           const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode } });
@@ -118,8 +119,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
           console.log("CameraFeed: Camera stream obtained:", mediaStream.id);
           if (videoRef.current) {
             videoRef.current.srcObject = mediaStream;
-            // Muted is already set on the video tag, no need to set here
-            videoRef.current.onloadedmetadata = () => { // Ensure metadata is loaded before play
+            videoRef.current.onloadedmetadata = () => { 
                  console.log("CameraFeed: Video metadata loaded. Attempting to play.");
                  videoRef.current?.play().then(() => {
                     console.log("CameraFeed: videoRef.play() successful.");
@@ -127,19 +127,20 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
                     if (onStarted) onStarted();
                  }).catch((playError) => {
                     console.warn("CameraFeed: videoRef.play() failed:", playError);
-                    // Error handling for play issues can be added here
-                    setError(`Gagal memulai pemutaran video: ${playError instanceof Error ? playError.message : "Kesalahan tidak diketahui."}`);
+                    const playErrorMessage = `Gagal memulai pemutaran video: ${playError instanceof Error ? playError.message : "Kesalahan tidak diketahui."}`;
+                    setError(playErrorMessage);
                     setIsLoading(false);
-                    if (onErrorOccurred) onErrorOccurred(`Gagal memulai pemutaran video: ${playError instanceof Error ? playError.message : "Kesalahan tidak diketahui."}`);
-                    stopCameraTracks(mediaStream); // Stop tracks if play fails
+                    if (onErrorOccurred) onErrorOccurred(playErrorMessage);
+                    stopCameraTracks(mediaStream); 
                     setInternalStream(null);
                  });
             };
           } else {
-             // This case should ideally not happen if videoRef is properly managed
              console.warn("CameraFeed: videoRef.current is null when trying to set srcObject.");
              setIsLoading(false);
              if (onErrorOccurred) onErrorOccurred("Referensi video tidak ditemukan.");
+             stopCameraTracks(mediaStream);
+             setInternalStream(null);
           }
         } catch (err) {
           console.error("CameraFeed: Error accessing camera:", err);
@@ -163,9 +164,9 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
 
     const stopCamera = () => {
       console.log("CameraFeed: Attempting to stop camera. Current internalStream:", internalStream?.id);
-      if (internalStream) { // Use state variable for consistency
+      if (internalStream) { 
         stopCameraTracks(internalStream);
-        setInternalStream(null); // Clear the stream state
+        setInternalStream(null); 
       }
       if (videoRef.current) {
         videoRef.current.srcObject = null;
@@ -174,22 +175,19 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
         console.log("CameraFeed: videoRef.srcObject set to null, paused, and loaded.");
       }
       setIsLoading(false); 
-      setError(null); // Clear any previous errors when camera is intentionally stopped
+      setError(null); 
       if (onStopped) onStopped();
     };
 
     if (isCameraActive) {
-       // Check if stream is not active or if tracks have ended (e.g. after permissions change or device unplug)
       if (!internalStream || internalStream.getTracks().every(track => track.readyState === 'ended')) {
         console.log("CameraFeed: useEffect - Camera active, starting/restarting camera.", internalStream ? "Stream ended." : "No stream.");
         startCamera();
       } else {
-        // If camera is active and stream exists and is running
         console.log("CameraFeed: useEffect - Camera active, stream already running.");
-        // This path is less common if onStarted is handled correctly in startCamera
         if (onStarted && !isLoading) onStarted(); 
       }
-    } else { // isCameraActive is false
+    } else { 
       if (internalStream) { 
         console.log("CameraFeed: useEffect - Camera inactive, stopping camera.");
         stopCamera();
@@ -205,11 +203,9 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
       if (videoRef.current && videoRef.current.srcObject === currentStreamRef && currentStreamRef !== null) {
         videoRef.current.srcObject = null;
       }
-      // Reset loading state on unmount if it was active.
-      // This might be handled by isCameraActive prop change from parent leading to stopCamera.
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps 
-  }, [isCameraActive, facingMode]); // Added facingMode to dependencies. Other deps (toast, stopCameraTracks, etc. are stable)
+  }, [isCameraActive, facingMode]);
 
   return (
     <div className="w-full h-full relative bg-black">
@@ -224,7 +220,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
         onError={(e) => console.error("CameraFeed: Video element error:", e)}
       />
       
-      {isCameraActive && internalStream && !isLoading && (
+      {isCameraActive && !isLoading && ( // Show switch button if camera is supposed to be active and not loading
         <Button
           onClick={handleToggleFacingMode}
           variant="outline"
@@ -244,7 +240,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
         </div>
       )}
       {isLoading && ( 
-         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 text-white z-20"> {/* Increased z-index */}
+         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 text-white z-20"> 
           <Aperture size={64} className="animate-spin mb-4 opacity-70"/>
           <p className="text-xl font-semibold">Mengakses Kamera...</p>
         </div>
