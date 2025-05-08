@@ -7,9 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { ChatMessageData } from '@/types';
 import { contextualChatWithVision, analyzeCameraFeed } from '@/ai/flows';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ChevronDown, ChevronUp, MessageSquareDashed } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { MessageSquareDashed } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ChatPanelProps {
@@ -29,9 +27,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
 }) => {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [isLoading, setIsLoading] = useState(false); // For AI message loading
-  const [isChatOpen, setIsChatOpen] = useState(true);
   const [isTtsEnabled, setIsTtsEnabled] = useState(true);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const chatContentRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -43,17 +39,15 @@ const ChatPanel: FC<ChatPanelProps> = ({
     if (typeof window !== 'undefined' && window.speechSynthesis && text && isTtsEnabled) {
       window.speechSynthesis.cancel(); // Stop any previous speech
       const utterance = new SpeechSynthesisUtterance(text);
-      // Attempt to use Indonesian voice if available
       const voices = window.speechSynthesis.getVoices();
       const indonesianVoice = voices.find(voice => voice.lang === 'id-ID' || voice.lang.startsWith('id-'));
       if (indonesianVoice) {
         utterance.voice = indonesianVoice;
       } else {
-         // Fallback for browsers where Indonesian might not be listed first or specific
         const defaultVoice = voices.find(voice => voice.default);
         if (defaultVoice) utterance.voice = defaultVoice;
       }
-      utterance.lang = 'id-ID'; // Set language hint
+      utterance.lang = 'id-ID';
       window.speechSynthesis.speak(utterance);
     }
   }, [isTtsEnabled]);
@@ -65,15 +59,14 @@ const ChatPanel: FC<ChatPanelProps> = ({
   }, []);
 
   useEffect(() => {
-    // Ensure voices are loaded, especially for specific voice selection
     const loadVoices = () => {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.getVoices(); // This call helps populate the voice list
+        window.speechSynthesis.getVoices();
       }
     };
     if (typeof window !== 'undefined' && window.speechSynthesis) {
-      loadVoices(); // Initial call
-      window.speechSynthesis.onvoiceschanged = loadVoices; // Event listener for when voices change
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
       return () => {
         window.speechSynthesis.onvoiceschanged = null;
       };
@@ -81,14 +74,14 @@ const ChatPanel: FC<ChatPanelProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isChatOpen && chatContentRef.current) {
+    if (chatContentRef.current) {
       setTimeout(() => {
         if (chatContentRef.current) {
           chatContentRef.current.scrollTop = chatContentRef.current.scrollHeight;
         }
       }, 0);
     }
-  }, [messages, isChatOpen]);
+  }, [messages]);
 
   useEffect(() => {
     if (capturedFrame && isCameraActive) {
@@ -192,64 +185,37 @@ const ChatPanel: FC<ChatPanelProps> = ({
 
   const toggleTts = () => {
     setIsTtsEnabled(prev => {
-      if (prev) stopSpeaking(); // If turning off, stop current speech
+      if (prev) stopSpeaking(); 
       return !prev;
     });
   };
 
   return (
-    <Card className={cn(
-      "w-full shadow-xl rounded-t-xl overflow-hidden bg-card/90 backdrop-blur-md transition-all duration-300 ease-in-out",
-      isChatOpen ? 'max-h-[75vh] sm:max-h-[65vh]' : 'max-h-[72px] sm:max-h-[80px]'
-    )}>
-      <CardHeader
-        className="flex flex-row items-center justify-between p-3 sm:p-4 cursor-pointer select-none"
-        onClick={() => setIsChatOpen(!isChatOpen)}
-      >
-        <div>
-          <CardTitle className="text-md sm:text-lg">VisionAI Chat</CardTitle>
-          {!isChatOpen && messages.length > 0 && (
-            <CardDescription className="text-xs mt-1 truncate max-w-[calc(100vw-120px)] sm:max-w-md">
-              {messages[messages.length - 1].role === 'user' ? 'You: ' : 'AI: '}
-              {messages[messages.length - 1].content}
-            </CardDescription>
-          )}
-          {!isChatOpen && messages.length === 0 && (
-            <CardDescription className="text-xs mt-1">Click to expand chat</CardDescription>
+    <div className="w-full flex flex-col overflow-hidden rounded-lg shadow-xl bg-black/40 backdrop-filter backdrop-blur-md max-h-[45vh] sm:max-h-[40vh]">
+      <ScrollArea className="flex-grow p-3 sm:p-4">
+        <div ref={chatContentRef} className="space-y-3">
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-neutral-200 py-8">
+              <MessageSquareDashed size={40} className="mb-3 sm:mb-4 text-neutral-300" />
+              <p className="text-sm sm:text-base text-center">Start the camera, capture a frame, or ask a question!</p>
+              <p className="text-xs text-center mt-1">Captured frames will be automatically analyzed.</p>
+            </div>
+          ) : (
+            messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)
           )}
         </div>
-        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground -mr-2 sm:mr-0">
-          {isChatOpen ? <ChevronDown className="h-5 w-5 sm:h-6 sm:w-6" /> : <ChevronUp className="h-5 w-5 sm:h-6 sm:w-6" />}
-          <span className="sr-only">{isChatOpen ? "Collapse Chat" : "Expand Chat"}</span>
-        </Button>
-      </CardHeader>
-
-      <div className={cn("transition-opacity duration-200", isChatOpen ? "opacity-100" : "opacity-0 h-0 overflow-hidden")}>
-        <ScrollArea viewPortClassName="max-h-[calc(75vh-140px)] sm:max-h-[calc(65vh-150px)]" className="h-full">
-          <div ref={chatContentRef} className="p-3 sm:p-4 space-y-3">
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-8">
-                <MessageSquareDashed size={40} className="mb-3 sm:mb-4" />
-                <p className="text-sm sm:text-base text-center">Start the camera, capture a frame, or ask a question!</p>
-                <p className="text-xs text-center mt-1">Captured frames will be automatically analyzed.</p>
-              </div>
-            ) : (
-              messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)
-            )}
-          </div>
-        </ScrollArea>
-        <ChatInput
-          onSendMessage={handleSendMessage}
-          isLoading={isLoading}
-          isCameraActive={isCameraActive}
-          isCameraProcessing={isCameraProcessing}
-          onToggleCamera={onToggleCamera}
-          isTtsEnabled={isTtsEnabled}
-          onToggleTts={toggleTts}
-          stopSpeaking={stopSpeaking}
-        />
-      </div>
-    </Card>
+      </ScrollArea>
+      <ChatInput
+        onSendMessage={handleSendMessage}
+        isLoading={isLoading}
+        isCameraActive={isCameraActive}
+        isCameraProcessing={isCameraProcessing}
+        onToggleCamera={onToggleCamera}
+        isTtsEnabled={isTtsEnabled}
+        onToggleTts={toggleTts}
+        stopSpeaking={stopSpeaking}
+      />
+    </div>
   );
 };
 
