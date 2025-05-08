@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useEffect, type FC, useCallback } from 'react';
@@ -195,11 +196,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
       <ScrollArea className="flex-grow p-3 sm:p-4">
         <div ref={chatContentRef} className="space-y-3">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-neutral-200 py-8">
-              <MessageSquareDashed size={40} className="mb-3 sm:mb-4 text-neutral-300" />
-              <p className="text-sm sm:text-base text-center">Start the camera, capture a frame, or ask a question!</p>
-              <p className="text-xs text-center mt-1">Captured frames will be automatically analyzed.</p>
-            </div>
+            null // Removed placeholder text
           ) : (
             messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)
           )}
@@ -220,3 +217,4 @@ const ChatPanel: FC<ChatPanelProps> = ({
 };
 
 export default ChatPanel;
+
