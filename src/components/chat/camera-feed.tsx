@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useEffect, type FC, useCallback } from 'react';
@@ -83,50 +82,56 @@ const CameraFeed: FC<CameraFeedProps> = ({
       if (!stream) {
         startCameraInternal();
       } else {
-        // Camera is desired active and stream already exists (e.g., state restored)
-        if (onStarted) onStarted(); // Ensure processing state is cleared
+        if (onStarted) onStarted(); 
       }
     } else {
       if (stream) {
         stopCameraInternal();
       } else {
-        // Camera is desired inactive and no stream exists
-        if (onStopped) onStopped(); // Ensure processing state is cleared
+        if (onStopped) onStopped(); 
       }
     }
 
-    // Cleanup function
     return () => {
-      // This cleanup is for when the component unmounts.
-      // If a stream exists, it should be stopped to release camera.
       if (videoRef.current && videoRef.current.srcObject) {
         const currentStream = videoRef.current.srcObject as MediaStream;
         currentStream.getTracks().forEach(track => track.stop());
         if (videoRef.current) videoRef.current.srcObject = null;
-        // Do not call onStopped here as it might interfere with parent's isCameraProcessing state
-        // if unmount is not tied to an explicit stop action by user.
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCameraActive]); // Removed stream, startCameraInternal, stopCameraInternal from deps to avoid potential loops/issues
-                        // Callbacks onStarted/onStopped are assumed stable from parent.
+  }, [isCameraActive, startCameraInternal, stopCameraInternal]); // Added start/stop internal to deps
 
   const captureFrame = () => {
     if (videoRef.current && stream && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
+      const videoElement = videoRef.current;
+      if (videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
+        toast({ 
+          title: "Kesalahan Pengambilan", 
+          description: "Dimensi video tidak valid. Kamera mungkin belum sepenuhnya siap atau resolusi tidak terdeteksi.", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
       const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth;
-      canvas.height = videoRef.current.videoHeight;
+      canvas.width = videoElement.videoWidth;
+      canvas.height = videoElement.videoHeight;
       const context = canvas.getContext('2d');
       if (context) {
-        context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const dataUri = canvas.toDataURL('image/jpeg', 1.0); // Set JPEG quality to maximum
+        context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+        const dataUri = canvas.toDataURL('image/jpeg', 0.9); // Use quality 0.9 for a balance
         onFrameCapture(dataUri);
         toast({ title: "Frame Ditangkap", description: "Gambar dikirim untuk analisis." });
       } else {
          toast({ title: "Kesalahan Pengambilan", description: "Tidak dapat mengambil konteks kanvas.", variant: "destructive" });
       }
     } else {
-      toast({ title: "Kesalahan Pengambilan", description: "Kamera belum siap atau tidak ada stream.", variant: "destructive" });
+      let reason = "Kamera belum siap atau tidak ada stream.";
+      if(videoRef.current && videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA){
+        reason = `Kamera tidak memiliki cukup data (readyState: ${videoRef.current.readyState}). Coba lagi.`;
+      }
+      toast({ title: "Kesalahan Pengambilan", description: reason, variant: "destructive" });
     }
   };
 
@@ -134,20 +139,20 @@ const CameraFeed: FC<CameraFeedProps> = ({
     <div className="w-full h-full relative bg-black">
       <video ref={videoRef} autoPlay playsInline muted className={`w-full h-full object-cover ${isCameraActive && stream ? 'block' : 'hidden'}`} />
       
-      {!isCameraActive && !error && !isLoading && ( // Show if camera is off, no error, not loading to start
+      {!isCameraActive && !error && !isLoading && ( 
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 text-white p-4">
           <VideoOffIconLucide size={64} className="mb-4 opacity-70"/>
           <p className="text-xl font-semibold">Kamera Mati</p>
           <p className="text-sm opacity-80 mt-1 text-center">Gunakan tombol kamera di panel obrolan untuk memulai.</p>
         </div>
       )}
-      {isLoading && ( // Show when startCameraInternal is running
+      {isLoading && ( 
          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 text-white">
           <Aperture size={64} className="animate-spin mb-4 opacity-70"/>
           <p className="text-xl font-semibold">Mengakses Kamera...</p>
         </div>
       )}
-       {error && !isLoading && ( // Show error if not currently trying to load (isLoading is for start process)
+       {error && !isLoading && ( 
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 sm:top-auto sm:bottom-1/3 p-4 flex justify-center z-30">
             <Alert variant="destructive" className="max-w-md bg-destructive/90 text-destructive-foreground border-destructive-foreground/50 shadow-2xl">
               <AlertCircle className="h-5 w-5" />
@@ -159,7 +164,6 @@ const CameraFeed: FC<CameraFeedProps> = ({
         </div>
       )}
 
-      {/* Floating Control Buttons - Only Capture Button Remains */}
       {isCameraActive && stream && (
         <div className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 flex space-x-3 sm:space-x-4 z-20">
           <Button 
@@ -179,4 +183,3 @@ const CameraFeed: FC<CameraFeedProps> = ({
 };
 
 export default CameraFeed;
-

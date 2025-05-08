@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useCallback } from 'react';
@@ -12,13 +11,13 @@ export default function VisionAIChatPage() {
   const [isCameraProcessing, setIsCameraProcessing] = useState<boolean>(false);
   const { toast } = useToast();
 
-  const handleFrameCapture = (dataUri: string) => {
+  const handleFrameCapture = useCallback((dataUri: string) => {
     setCapturedFrame(dataUri);
-  };
+  }, []);
 
-  const clearCapturedFrame = () => {
+  const clearCapturedFrame = useCallback(() => {
     setCapturedFrame(null);
-  }
+  }, []);
 
   const handleToggleCamera = useCallback(() => {
     setIsCameraProcessing(true);
@@ -28,7 +27,6 @@ export default function VisionAIChatPage() {
   const handleCameraStarted = useCallback(() => {
     setIsCameraProcessing(false);
     // If isCameraActive is false here, it means it was toggled off rapidly after being toggled on.
-    // We should ensure our state reflects the actual outcome.
     // The CameraFeed component will only call onStarted if it successfully started.
     if (!isCameraActive) {
         // This case should ideally not happen if logic is tight, but as a safeguard:
@@ -47,7 +45,10 @@ export default function VisionAIChatPage() {
   const handleCameraError = useCallback((errorMessage: string) => {
     setIsCameraProcessing(false);
     // If camera was intended to be active, but failed, turn it off.
-    if (isCameraActive) {
+    // The local isCameraActive state will be checked against the state when this callback was created.
+    // If isCameraActive was true when this was created, and an error occurs, setIsCameraActive(false) is called.
+    // This should correctly reflect the camera's off state.
+    if (isCameraActive) { 
         setIsCameraActive(false);
     }
     // Toast is already shown by CameraFeed, but can add more specific ones here if needed.
@@ -94,4 +95,3 @@ export default function VisionAIChatPage() {
     </div>
   );
 }
-

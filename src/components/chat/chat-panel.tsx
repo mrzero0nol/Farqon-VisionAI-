@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useEffect, type FC, useCallback } from 'react';
@@ -32,9 +31,15 @@ const ChatPanel: FC<ChatPanelProps> = ({
   const chatContentRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  const addMessage = (message: ChatMessageData) => {
+  const addMessage = useCallback((message: ChatMessageData) => {
     setMessages(prev => [...prev, message]);
-  };
+  }, []);
+
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
 
   const speakText = useCallback((text: string) => {
     if (typeof window !== 'undefined' && window.speechSynthesis && text && isTtsEnabled) {
@@ -53,20 +58,14 @@ const ChatPanel: FC<ChatPanelProps> = ({
     }
   }, [isTtsEnabled]);
 
-  const stopSpeaking = useCallback(() => {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
-  }, []);
-
   useEffect(() => {
     const loadVoices = () => {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.getVoices();
+        window.speechSynthesis.getVoices(); // Ensure voices are loaded
       }
     };
     if (typeof window !== 'undefined' && window.speechSynthesis) {
-      loadVoices();
+      loadVoices(); // Initial load
       window.speechSynthesis.onvoiceschanged = loadVoices;
       return () => {
         window.speechSynthesis.onvoiceschanged = null;
@@ -84,15 +83,8 @@ const ChatPanel: FC<ChatPanelProps> = ({
     }
   }, [messages]);
 
-  useEffect(() => {
-    if (capturedFrame && isCameraActive) {
-      handleAnalyzeFrame(capturedFrame);
-      clearCapturedFrame();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capturedFrame, isCameraActive]);
 
-  const handleAnalyzeFrame = async (imageDataUri: string) => {
+  const handleAnalyzeFrame = useCallback(async (imageDataUri: string) => {
     setIsLoading(true);
     stopSpeaking();
     addMessage({ id: Date.now().toString() + 'img-prompt', role: 'user', content: 'Apa yang Anda lihat di gambar ini?', image: imageDataUri });
@@ -114,14 +106,39 @@ const ChatPanel: FC<ChatPanelProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [addMessage, speakText, stopSpeaking, toast]);
+  
+  useEffect(() => {
+    // Trigger analysis only when capturedFrame is newly set and valid.
+    // isCameraActive check removed from here, as frame capture itself implies camera was active.
+    // Analysis should proceed even if camera is toggled off right after capture.
+    if (capturedFrame) { 
+      handleAnalyzeFrame(capturedFrame);
+      clearCapturedFrame(); // Clear it after initiating analysis to prevent re-analysis on re-renders.
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capturedFrame, handleAnalyzeFrame, clearCapturedFrame]); // Only react to capturedFrame changes
 
-  const handleSendMessage = async (userQuestion: string) => {
+
+  const handleSendMessage = useCallback(async (userQuestion: string) => {
     stopSpeaking();
-    if (!capturedFrame && !isCameraActive) {
+    
+    // Use the `capturedFrame` state variable, which holds the last captured frame.
+    // It's cleared by `handleAnalyzeFrame` after initiating analysis.
+    // If a question is asked immediately after auto-analysis, `capturedFrame` might be null here.
+    // This logic assumes a question relates to the *last visual context*, which is the analyzed frame.
+    // If no frame has been captured and analyzed recently, it will prompt to start camera.
+    
+    // Determine if there's *any* visual context.
+    // This depends on how `capturedFrame` is managed by the parent and when `handleAnalyzeFrame` clears it.
+    // Let's assume if a message has an image, that's our context.
+    const lastMessageWithImage = messages.slice().reverse().find(msg => msg.image);
+    const imageContextForQuestion = lastMessageWithImage?.image;
+
+    if (!isCameraActive && !imageContextForQuestion) {
       toast({
         title: "Tidak Ada Konteks Gambar",
-        description: "Silakan mulai kamera dan tangkap frame, atau pastikan frame baru saja ditangkap untuk bertanya tentangnya.",
+        description: "Silakan mulai kamera dan tangkap frame untuk bertanya tentangnya.",
         variant: "destructive"
       });
       addMessage({ id: Date.now().toString() + '-user-error', role: 'user', content: userQuestion });
@@ -130,59 +147,47 @@ const ChatPanel: FC<ChatPanelProps> = ({
       speakText(aiErrorMsg);
       return;
     }
-
-    const imageToSend = capturedFrame;
-
-    addMessage({ id: Date.now().toString(), role: 'user', content: userQuestion, image: imageToSend ? imageToSend : undefined });
+    
+    addMessage({ id: Date.now().toString(), role: 'user', content: userQuestion, image: imageContextForQuestion ? imageContextForQuestion : undefined });
     setIsLoading(true);
 
-    if (!imageToSend && isCameraActive) {
-      const aiMsg = "Saya tidak memiliki gambar spesifik untuk pertanyaan ini. Harap tangkap frame jika Anda ingin saya menganalisis sesuatu yang baru. Saya akan mencoba menjawab berdasarkan pengetahuan umum atau konteks sebelumnya jika ada.";
-      addMessage({ id: Date.now().toString() + '-no-img', role: 'assistant', content: aiMsg });
-      speakText(aiMsg);
-      toast({
-        title: "Tidak Ada Gambar untuk Pertanyaan",
-        description: "Harap tangkap frame untuk bertanya tentang konten visual tertentu.",
-        variant: "warning"
-      });
-      setIsLoading(false);
-      return;
-    }
-
-    if (!imageToSend && !isCameraActive) {
-      const aiErrorMsg = "Saya tidak bisa melihat apa pun saat ini. Harap mulai kamera dan tangkap gambar.";
-      addMessage({ id: Date.now().toString() + '-critical-no-img', role: 'assistant', content: aiErrorMsg, isError: true });
-      speakText(aiErrorMsg);
-      setIsLoading(false);
-      return;
-    }
-
-    if (imageToSend) {
-      try {
-        const response = await contextualChatWithVision({ photoDataUri: imageToSend, question: userQuestion });
-        addMessage({ id: Date.now().toString(), role: 'assistant', content: response.answer });
-        if(response.answer) speakText(response.answer);
-      } catch (error) {
-        console.error("Error in contextual chat:", error);
-        const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui.";
-        const aiErrorMsg = `Maaf, saya mengalami kesalahan: ${errorMessage}`;
-        addMessage({ id: Date.now().toString(), role: 'assistant', content: aiErrorMsg, isError: true });
-        speakText(aiErrorMsg);
+    if (!imageContextForQuestion) {
+        // This case means camera might be active, but no frame was explicitly captured *for this question*
+        // or the auto-analyzed frame is not considered the direct context for this specific question.
+        // The AI should be informed.
+        const aiMsg = "Saya tidak memiliki gambar spesifik untuk pertanyaan ini. Jika Anda ingin saya melihat sesuatu yang baru, harap tangkap frame. Saya akan mencoba menjawab berdasarkan pengetahuan umum atau konteks visual sebelumnya jika ada.";
+        addMessage({ id: Date.now().toString() + '-no-img', role: 'assistant', content: aiMsg });
+        speakText(aiMsg);
         toast({
-          title: "Kesalahan Obrolan AI",
-          description: `Gagal mendapatkan respons. ${errorMessage}`,
-          variant: "destructive",
+          title: "Tidak Ada Gambar Baru untuk Pertanyaan Ini",
+          description: "Harap tangkap frame jika Anda ingin bertanya tentang konten visual tertentu yang baru.",
+          variant: "info"
         });
-      } finally {
         setIsLoading(false);
-      }
-    } else {
-      const aiErrorMsg = "Saya tidak memiliki gambar untuk dirujuk untuk pertanyaan Anda. Harap tangkap frame.";
-      addMessage({ id: Date.now().toString() + '-fallback-no-img', role: 'assistant', content: aiErrorMsg, isError: true });
+        return;
+    }
+
+
+    // If we have imageContextForQuestion, proceed with contextual chat
+    try {
+      const response = await contextualChatWithVision({ photoDataUri: imageContextForQuestion, question: userQuestion });
+      addMessage({ id: Date.now().toString(), role: 'assistant', content: response.answer });
+      if(response.answer) speakText(response.answer);
+    } catch (error) {
+      console.error("Error in contextual chat:", error);
+      const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui.";
+      const aiErrorMsg = `Maaf, saya mengalami kesalahan: ${errorMessage}`;
+      addMessage({ id: Date.now().toString(), role: 'assistant', content: aiErrorMsg, isError: true });
       speakText(aiErrorMsg);
+      toast({
+        title: "Kesalahan Obrolan AI",
+        description: `Gagal mendapatkan respons. ${errorMessage}`,
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
     }
-  };
+  }, [addMessage, speakText, stopSpeaking, toast, isCameraActive, messages]);
 
   const toggleTts = () => {
     setIsTtsEnabled(prev => {
@@ -196,7 +201,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
       <ScrollArea className="flex-grow p-3 sm:p-4">
         <div ref={chatContentRef} className="space-y-3">
           {messages.length === 0 ? (
-            null // Removed placeholder text
+            null 
           ) : (
             messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)
           )}
@@ -217,4 +222,3 @@ const ChatPanel: FC<ChatPanelProps> = ({
 };
 
 export default ChatPanel;
-
