@@ -2,10 +2,9 @@
 'use client';
 
 import { useState, useRef, useEffect, type FC, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { Aperture, AlertCircle, VideoOff as VideoOffIconLucide } from 'lucide-react'; // Removed SwitchCamera
+import { Aperture, AlertCircle, VideoOff as VideoOffIconLucide } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-// import { Button } from '@/components/ui/button'; // Button is no longer used here
 import type { CameraFeedRefType } from '@/types';
 
 interface CameraFeedProps {
@@ -13,7 +12,7 @@ interface CameraFeedProps {
   onStarted?: () => void;
   onStopped?: () => void;
   onErrorOccurred?: (errorMessage: string) => void;
-  isCameraProcessing?: boolean; // From parent, indicates external processing like initial start/stop
+  isCameraProcessing?: boolean; 
 }
 
 const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
@@ -21,12 +20,12 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
   onStarted,
   onStopped,
   onErrorOccurred,
-  isCameraProcessing, // Consume prop
+  isCameraProcessing,
 }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [internalStream, setInternalStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false); // Internal loading for stream acquisition
+  const [isLoading, setIsLoading] = useState<boolean>(false); 
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const { toast } = useToast();
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | undefined>(undefined);
@@ -56,7 +55,6 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
       console.log("CameraFeed: Capture - Camera not ready, stream not available, or video data not loaded.");
       return null;
     },
-    // Expose toggleFacingMode to be called from parent if needed, e.g., by ChatInput
     toggleFacingMode: async () => {
       if (isLoading || isCameraProcessing) {
         console.log("CameraFeed: Camera is busy (isLoading or isCameraProcessing is true), cannot toggle facing mode now.");
@@ -109,7 +107,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
       } else {
         console.warn("CameraFeed: MediaDevices API not available.");
         const unsupportedMessage = "Akses kamera tidak didukung oleh browser ini.";
-        setError(unsupportedMessage);
+        setError(unsupportedMessage); // Set component error state
         setHasCameraPermission(false);
         if (onErrorOccurred) onErrorOccurred(unsupportedMessage);
       }
@@ -117,7 +115,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
     if(hasCameraPermission === undefined) { 
         getInitialCameraPermission();
     }
-  }, [onErrorOccurred, stopCameraTracks, toast, hasCameraPermission]);
+  }, [onErrorOccurred, stopCameraTracks, toast, hasCameraPermission]); // Keep hasCameraPermission to re-check if it becomes undefined somehow
 
 
   useEffect(() => {
@@ -127,9 +125,10 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
       if (hasCameraPermission === false) {
         console.log("CameraFeed: Cannot start camera, permission not granted or explicitly denied.");
         setIsLoading(false); 
-        if (onErrorOccurred && !error) {
+        if (onErrorOccurred) { // Removed !error condition to always report if permission is issue
              const permError = "Izin kamera belum diberikan atau ditolak.";
              onErrorOccurred(permError); 
+             setError(permError); // Also set local error state
         }
         return;
       }
@@ -139,15 +138,16 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
         return;
       }
 
-      console.log(`CameraFeed: Attempting to start camera. Active: ${isCameraActive}, Mode: ${facingMode}, Current Stream: ${internalStream?.id}`);
+      console.log(`CameraFeed: Attempting to start camera. Active: ${isCameraActive}, Mode: ${facingMode}`);
       
       setError(null); 
       setIsLoading(true);
 
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const constraints = { video: { facingMode: facingMode as VideoFacingModeEnum } };
+        console.log('CameraFeed: Requesting media with constraints:', constraints);
         try {
-          console.log(`CameraFeed: Requesting media stream with facingMode: ${facingMode}`);
-          const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode } });
+          const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
           effectInstanceStream = mediaStream;
           setInternalStream(mediaStream);
           console.log("CameraFeed: Camera stream obtained:", mediaStream.id, "Tracks:", mediaStream.getTracks().map(t => t.label));
@@ -203,7 +203,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
               case 'DevicesNotFoundError':
                 userFriendlyMessage = `Kamera mode '${facingMode}' tidak ditemukan.`;
                 break;
-              case 'OverconstrainedError':
+              case 'OverconstrainedError': // Often implies "Could not start video source" if constraints too specific
                  userFriendlyMessage = `Tidak dapat memenuhi batasan untuk kamera mode '${facingMode}'. Perangkat mungkin tidak mendukung mode ini atau resolusi yang diminta. (Detail: ${technicalMessage})`;
                  if (technicalMessage.toLowerCase().includes("could not start video source")) {
                      userFriendlyMessage = `Tidak dapat memulai sumber video untuk mode '${facingMode}'. Ini mungkin karena mode tidak tersedia, atau ada konflik. (Detail: ${technicalMessage})`;
@@ -217,7 +217,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
               case 'AbortError':
                 userFriendlyMessage = `Akses kamera dibatalkan.`;
                 break;
-              case 'NotReadableError':
+              case 'NotReadableError': // Can also imply "Could not start video source"
               case 'TrackStartError':
                 userFriendlyMessage = `Kamera mungkin sedang digunakan oleh aplikasi lain, atau ada masalah dengan perangkat keras kamera (mode '${facingMode}'). (Detail: ${technicalMessage})`;
                 if (technicalMessage.toLowerCase().includes("could not start video source")) {
@@ -251,9 +251,11 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
       console.log("CameraFeed: useEffect - Camera active, proceeding to start/ensure camera.");
       startCamera();
     } else { 
-      console.log("CameraFeed: useEffect - Camera inactive. Current stream:", internalStream?.id);
+      // This internalStream is from component state.
+      // The effect's own stream (effectInstanceStream) will be cleaned up by the return function.
+      console.log("CameraFeed: useEffect - Camera inactive. Current internalStream from state:", internalStream?.id);
       if (internalStream) { 
-        stopCameraTracks(internalStream, "camera becoming inactive");
+        stopCameraTracks(internalStream, "camera becoming inactive (from state)");
         setInternalStream(null); 
         if (videoRef.current) {
           videoRef.current.srcObject = null;
@@ -261,6 +263,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
         }
       }
       setIsLoading(false); 
+      setError(null); // Clear errors when camera is intentionally stopped
       if (onStopped) onStopped(); 
     }
 
@@ -271,6 +274,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
         videoRef.current.srcObject = null; 
         videoRef.current.pause();
       }
+      // Ensure internalStream is cleared if it was the one managed by this effect instance
       setInternalStream(current => {
         if (current === effectInstanceStream) {
           console.log("CameraFeed: useEffect cleanup - clearing internalStream as it matches the effectInstanceStream being cleaned up.");
@@ -278,14 +282,15 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
         }
         return current;
       });
-      setIsLoading(false);
+      setIsLoading(false); // Reset loading state on cleanup
     };
-  }, [isCameraActive, facingMode, hasCameraPermission, stopCameraTracks, onErrorOccurred, onStarted, onStopped, toast, internalStream, error]);
+  // Core dependencies that drive the camera's state. Callbacks should be stable.
+  }, [isCameraActive, facingMode, hasCameraPermission, stopCameraTracks, onErrorOccurred, onStarted, onStopped, toast]);
 
 
-  const showLoadingIndicator = isLoading || (isCameraActive && hasCameraPermission === undefined) || (isCameraActive && hasCameraPermission && !internalStream && !error);
+  const showLoadingIndicator = isLoading || (isCameraActive && hasCameraPermission === undefined) || (isCameraActive && hasCameraPermission && !internalStream && !error && !isCameraProcessing);
   const showVideo = isCameraActive && internalStream && !isLoading && hasCameraPermission && !error;
-  const showCameraOffMessage = !isCameraActive && !isLoading && hasCameraPermission === true && !error; 
+  const showCameraOffMessage = !isCameraActive && !isLoading && (hasCameraPermission === true || hasCameraPermission === undefined) && !error; 
   const showPermissionNeededMessage = hasCameraPermission === false && !isLoading;
   const showErrorAlert = error && !isLoading;
 
@@ -310,8 +315,6 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
         }}
       />
 
-      {/* SwitchCamera button removed from here */}
-
       {showCameraOffMessage && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 text-white p-4">
           <VideoOffIconLucide size={64} className="mb-4 opacity-70"/>
@@ -323,7 +326,7 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 text-white z-20">
           <Aperture size={64} className="animate-spin mb-4 opacity-70"/>
           <p className="text-xl font-semibold">
-            {hasCameraPermission === undefined ? "Memeriksa Izin..." : "Mengakses Kamera..."}
+            {isCameraProcessing ? "Memproses..." : hasCameraPermission === undefined ? "Memeriksa Izin..." : "Mengakses Kamera..."}
           </p>
         </div>
       )}
@@ -356,3 +359,4 @@ const CameraFeed = forwardRef<CameraFeedRefType, CameraFeedProps>(({
 
 CameraFeed.displayName = 'CameraFeed';
 export default CameraFeed;
+
