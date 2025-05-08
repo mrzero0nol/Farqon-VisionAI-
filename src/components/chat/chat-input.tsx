@@ -1,10 +1,11 @@
-
 'use client';
 
-import { useState, type FC, type FormEvent } from 'react';
+import { useState, type FC, type FormEvent, useEffect, useRef }
+from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Send, Loader2, Video, VideoOff } from 'lucide-react';
+import { Send, Loader2, Video, VideoOff, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -12,52 +13,172 @@ interface ChatInputProps {
   isCameraActive: boolean;
   isCameraProcessing: boolean;
   onToggleCamera: () => void;
+  isTtsEnabled: boolean;
+  onToggleTts: () => void;
+  stopSpeaking: () => void;
 }
 
-const ChatInput: FC<ChatInputProps> = ({ 
-  onSendMessage, 
-  isLoading, 
-  isCameraActive, 
-  isCameraProcessing, 
-  onToggleCamera 
+const ChatInput: FC<ChatInputProps> = ({
+  onSendMessage,
+  isLoading,
+  isCameraActive,
+  isCameraProcessing,
+  onToggleCamera,
+  isTtsEnabled,
+  onToggleTts,
+  stopSpeaking,
 }) => {
   const [inputValue, setInputValue] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const speechRecognitionRef = useRef<any>(null); // SpeechRecognition instance
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognitionAPI = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognitionAPI) {
+        const recognitionInstance = new SpeechRecognitionAPI();
+        recognitionInstance.continuous = false; // Process single utterances
+        recognitionInstance.interimResults = true; // Show interim results
+        recognitionInstance.lang = 'id-ID'; // Set language to Indonesian for better recognition
+
+        recognitionInstance.onresult = (event: any) => {
+          let interimTranscript = '';
+          let finalTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript;
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
+          }
+          setInputValue(finalTranscript || interimTranscript);
+          if (finalTranscript) {
+            // Optional: auto-send if final transcript is clear.
+            // For now, user needs to press send.
+            // setIsRecording(false); // stop recording after final result
+          }
+        };
+
+        recognitionInstance.onerror = (event: any) => {
+          console.error('Speech recognition error:', event.error);
+          toast({
+            title: 'Voice Error',
+            description: `Speech recognition error: ${event.error === 'no-speech' ? 'No speech detected.' : event.error === 'not-allowed' ? 'Microphone access denied.' : event.error}`,
+            variant: 'destructive',
+          });
+          setIsRecording(false);
+        };
+
+        recognitionInstance.onend = () => {
+          setIsRecording(false);
+        };
+        speechRecognitionRef.current = recognitionInstance;
+      } else {
+        // Toast shown once if API not supported, not on every render.
+        // This could be moved to a top-level component or context if needed globally.
+      }
+    }
+
+    return () => {
+      if (speechRecognitionRef.current) {
+        speechRecognitionRef.current.abort();
+      }
+    };
+  }, [toast]);
+
+  const handleMicClick = () => {
+    stopSpeaking(); // Stop any ongoing TTS
+    if (!speechRecognitionRef.current) {
+      toast({ title: "Voice Input Not Supported", description: "Your browser does not support speech recognition.", variant: "destructive" });
+      return;
+    }
+
+    if (isRecording) {
+      speechRecognitionRef.current.stop();
+      setIsRecording(false);
+    } else {
+      try {
+        setInputValue(''); // Clear input before starting new recording
+        speechRecognitionRef.current.start();
+        setIsRecording(true);
+      } catch (error) {
+        console.error("Error starting speech recognition:", error);
+        toast({ title: "Voice Error", description: "Could not start voice input.", variant: "destructive" });
+        setIsRecording(false);
+      }
+    }
+  };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    stopSpeaking(); // Stop any ongoing TTS
+
+    if (isRecording && speechRecognitionRef.current) {
+      speechRecognitionRef.current.stop(); // Stop recording if user manually submits
+      setIsRecording(false);
+    }
     if (inputValue.trim() && !isLoading) {
       onSendMessage(inputValue.trim());
       setInputValue('');
     }
   };
+  
+  const commonDisabled = isLoading || isCameraProcessing;
 
   return (
     <form onSubmit={handleSubmit} className="flex items-center space-x-2 p-4 border-t bg-background">
       <Input
         type="text"
-        placeholder="Ask about what the camera sees..."
+        placeholder={isRecording ? "Listening..." : "Ask about what the camera sees..."}
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         className="flex-grow rounded-full focus-visible:ring-accent"
-        disabled={isLoading || isCameraProcessing}
+        disabled={commonDisabled}
+        readOnly={isRecording}
         aria-label="Chat message input"
       />
-      <Button 
-        type="button" 
-        size="icon" 
-        variant="outline" 
-        className="rounded-full" 
-        onClick={onToggleCamera} 
-        disabled={isLoading || isCameraProcessing}
+      <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        className="rounded-full"
+        onClick={handleMicClick}
+        disabled={commonDisabled}
+        aria-label={isRecording ? "Stop recording" : "Start recording"}
+      >
+        {isRecording ? <MicOff className="h-5 w-5 text-destructive" /> : <Mic className="h-5 w-5" />}
+      </Button>
+      <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        className="rounded-full"
+        onClick={onToggleCamera}
+        disabled={commonDisabled || isRecording}
         aria-label={isCameraActive ? "Turn off camera" : "Turn on camera"}
       >
         {isCameraProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : isCameraActive ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
       </Button>
-      <Button 
-        type="submit" 
-        size="icon" 
-        className="rounded-full bg-accent hover:bg-accent/90 text-accent-foreground" 
-        disabled={isLoading || isCameraProcessing || !inputValue.trim()} 
+       <Button
+        type="button"
+        size="icon"
+        variant="outline"
+        className="rounded-full"
+        onClick={() => {
+          onToggleTts();
+          if (isTtsEnabled) stopSpeaking(); // If turning off, stop current speech
+        }}
+        disabled={commonDisabled}
+        aria-label={isTtsEnabled ? "Disable AI voice" : "Enable AI voice"}
+      >
+        {isTtsEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+      </Button>
+      <Button
+        type="submit"
+        size="icon"
+        className="rounded-full bg-accent hover:bg-accent/90 text-accent-foreground"
+        disabled={commonDisabled || !inputValue.trim()}
         aria-label="Send message"
       >
         {isLoading && !isCameraProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
