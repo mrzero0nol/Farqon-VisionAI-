@@ -192,7 +192,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
   };
 
   return (
-    <div className="w-full flex flex-col overflow-hidden rounded-lg shadow-xl bg-black/40 backdrop-filter backdrop-blur-md max-h-[45vh] sm:max-h-[40vh]">
+    <div className="w-full flex flex-col overflow-hidden max-h-[45vh] sm:max-h-[40vh]">
       <ScrollArea className="flex-grow p-3 sm:p-4">
         <div ref={chatContentRef} className="space-y-3">
           {messages.length === 0 ? (

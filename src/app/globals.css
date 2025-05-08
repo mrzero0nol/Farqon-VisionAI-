@@ -67,7 +67,7 @@
     --secondary-foreground: 0 0% 98%;
 
     --muted: 240 4% 15%;
-    --muted-foreground: 0 0% 63.9%;
+    --muted-foreground: 0 0% 63.9%; /* Adjusted for better visibility on dark backgrounds */
 
     --accent: 233 64% 45%; /* Dark Blue as accent in dark mode */
     --accent-foreground: 0 0% 98%;
@@ -76,7 +76,7 @@
     --destructive-foreground: 0 0% 98%;
 
     --border: 240 4% 15%;
-    --input: 240 4% 15%;
+    --input: 240 4% 15%; /* Input background for dark mode */
     --ring: 187 100% 50%; /* Teal for ring in dark mode */
     
     --chart-1: 220 70% 50%;
@@ -103,5 +103,32 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  /* Ensure placeholder text in inputs is legible, especially for transparent inputs on camera feed */
+  input::placeholder, textarea::placeholder {
+    @apply text-muted-foreground/80; /* Default for light theme */
+  }
+  .dark input::placeholder, .dark textarea::placeholder {
+    @apply text-muted-foreground/70; /* Adjusted for dark theme */
+  }
+   /* Specific override for ChatInput's placeholder when it's on a potentially dark (camera) background */
+  .bg-background\/70 input::placeholder { /* targeting the specific semi-transparent input */
+     @apply text-white/70; /* Assuming camera feed is often dark, white placeholder is better */
+  }
+  .dark .bg-background\/70 input::placeholder { /* if dark mode is on, this is likely already covered by .dark input::placeholder */
+     @apply text-white/70;
+  }
+}
+
+/* Custom styling for chat input on camera view */
+@layer components {
+  .chat-input-on-camera {
+    @apply bg-white/20 placeholder-white/70 text-white border-white/30;
+  }
+  .chat-input-on-camera.dark { /* In case dark mode has different ideas for text/placeholder */
+     @apply placeholder-white/70 text-white;
+  }
+   .chat-button-on-camera {
+    @apply border-white/30 bg-white/20 hover:bg-white/30 text-white;
   }
 }

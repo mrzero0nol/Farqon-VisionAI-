@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, type FC, type FormEvent, useEffect, useRef }
@@ -137,13 +138,16 @@ const ChatInput: FC<ChatInputProps> = ({
   const commonDisabled = isLoading || isCameraProcessing;
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-center space-x-2 p-4 border-t bg-background">
+    <form 
+      onSubmit={handleSubmit} 
+      className="flex items-center space-x-2 p-4 border-t border-white/20 bg-background/70 backdrop-filter backdrop-blur-sm"
+    >
       <Input
         type="text"
         placeholder={isRecording ? "Listening..." : "Ask about what the camera sees..."}
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
-        className="flex-grow rounded-full focus-visible:ring-accent"
+        className="flex-grow rounded-full focus-visible:ring-accent bg-white/20 placeholder-white/70 text-white border-white/30"
         disabled={commonDisabled}
         readOnly={isRecording}
         aria-label="Chat message input"
@@ -152,7 +156,7 @@ const ChatInput: FC<ChatInputProps> = ({
         type="button"
         size="icon"
         variant="outline"
-        className="rounded-full"
+        className="rounded-full border-white/30 bg-white/20 hover:bg-white/30 text-white"
         onClick={handleMicClick}
         disabled={commonDisabled}
         aria-label={isRecording ? "Stop recording" : "Start recording"}
@@ -163,7 +167,7 @@ const ChatInput: FC<ChatInputProps> = ({
         type="button"
         size="icon"
         variant="outline"
-        className="rounded-full"
+        className="rounded-full border-white/30 bg-white/20 hover:bg-white/30 text-white"
         onClick={onToggleCamera}
         disabled={commonDisabled || isRecording} // Disable camera toggle while recording
         aria-label={isCameraActive ? "Turn off camera" : "Turn on camera"}
@@ -174,7 +178,7 @@ const ChatInput: FC<ChatInputProps> = ({
         type="button"
         size="icon"
         variant="outline"
-        className="rounded-full"
+        className="rounded-full border-white/30 bg-white/20 hover:bg-white/30 text-white"
         onClick={() => {
           onToggleTts();
           if (isTtsEnabled) stopSpeaking(); // If turning off, stop current speech
