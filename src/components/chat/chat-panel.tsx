@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useEffect, type FC, useCallback } from 'react';
@@ -28,7 +27,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
 }) => {
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
   const [isTtsEnabled, setIsTtsEnabled] = useState(true);
-  const [currentContextImageUri, setCurrentContextImageUri] = useState<string | null>(null);
+  // const [currentContextImageUri, setCurrentContextImageUri] = useState<string | null>(null); // Removed unused state
   const chatContentRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -109,7 +108,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
       return;
     }
   
-    setCurrentContextImageUri(imageDataUri); // Set image for user message display
+    // setCurrentContextImageUri(imageDataUri); // This line is removed as currentContextImageUri state is removed
     
     const userMessageId = Date.now().toString();
     // Add user message with the captured image
