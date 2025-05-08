@@ -5,7 +5,7 @@ import { useState, type FC, type FormEvent, useEffect, useRef }
 from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Send, Loader2, Video, VideoOff, Mic, MicOff, Volume2, VolumeX, Eye } from 'lucide-react';
+import { Send, Loader2, Video, VideoOff, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ChatInputProps {
@@ -17,7 +17,6 @@ interface ChatInputProps {
   isTtsEnabled: boolean;
   onToggleTts: () => void;
   stopSpeaking: () => void;
-  onAnalyzeScene: () => void; // New prop for triggering scene analysis
 }
 
 const ChatInput: FC<ChatInputProps> = ({
@@ -29,7 +28,6 @@ const ChatInput: FC<ChatInputProps> = ({
   isTtsEnabled,
   onToggleTts,
   stopSpeaking,
-  onAnalyzeScene,
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -155,17 +153,6 @@ const ChatInput: FC<ChatInputProps> = ({
         aria-label={isRecording ? "Hentikan perekaman" : "Mulai perekaman"}
       >
         {isRecording ? <MicOff className="h-5 w-5 text-destructive" /> : <Mic className="h-5 w-5" />}
-      </Button>
-       <Button
-        type="button"
-        size="icon"
-        variant="outline"
-        className="rounded-full border-white/30 bg-white/20 hover:bg-white/30 text-white"
-        onClick={onAnalyzeScene}
-        disabled={commonDisabled || isRecording || !isCameraActive}
-        aria-label="Analisis pemandangan saat ini"
-      >
-        <Eye className="h-5 w-5" />
       </Button>
       <Button
         type="button"

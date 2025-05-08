@@ -6,7 +6,7 @@ import ChatMessage from './chat-message';
 import ChatInput from './chat-input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { ChatMessageData, CameraFeedRefType } from '@/types';
-import { contextualChatWithVision, analyzeCameraFeed } from '@/ai/flows';
+import { contextualChatWithVision } from '@/ai/flows';
 import { useToast } from '@/hooks/use-toast';
 
 interface ChatPanelProps {
@@ -84,93 +84,48 @@ const ChatPanel: FC<ChatPanelProps> = ({
       }, 0);
     }
   }, [messages]);
-
-  const handleAnalyzeScene = useCallback(async (imageDataUri: string) => {
-    setIsAiAnalyzing(true);
-    stopSpeaking();
-    setCurrentContextImageUri(imageDataUri); // Set the context image for subsequent questions
-
-    try {
-      console.log("ChatPanel: Sending frame for AI analysis.");
-      const response = await analyzeCameraFeed({ photoDataUri: imageDataUri });
-      addMessage({ 
-        id: Date.now().toString() + '-manual-analysis', 
-        role: 'assistant', 
-        content: response.summary, 
-        image: imageDataUri // Display the newly analyzed image with the analysis
-      });
-      if (response.summary) speakText(response.summary);
-    } catch (error) {
-      console.error("Error analyzing camera feed:", error);
-      const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui.";
-      addMessage({ id: Date.now().toString() + '-manual-err', role: 'assistant', content: `Maaf, terjadi kesalahan saat menganalisis pemandangan: ${errorMessage.substring(0,100)}...`, isError: true });
-      speakText(`Analisis pemandangan gagal.`);
-      toast({
-        title: "Kesalahan Analisis",
-        description: `Gagal menganalisis pemandangan. ${errorMessage}`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsAiAnalyzing(false);
-    }
-  }, [addMessage, speakText, stopSpeaking, setIsAiAnalyzing, toast, setCurrentContextImageUri]);
-
-  const triggerManualSceneAnalysis = useCallback(async () => {
-    if (isAiAnalyzing) {
-      toast({ title: "Analisis Sedang Berjalan", description: "Harap tunggu analisis saat ini selesai.", variant: "default" });
-      return;
-    }
-    if (!isCameraActive || !cameraFeedRef.current) {
-      toast({ title: "Kamera Tidak Aktif", description: "Aktifkan kamera terlebih dahulu untuk menganalisis pemandangan.", variant: "destructive" });
-      return;
-    }
-
-    console.log("ChatPanel: Attempting to capture frame manually.");
-    const imageDataUri = cameraFeedRef.current.captureCurrentFrame();
-
-    if (imageDataUri) {
-      console.log("ChatPanel: Manual frame captured successfully.");
-      await handleAnalyzeScene(imageDataUri); // Pass the new frame to handleAnalyzeScene
-    } else {
-      console.warn("ChatPanel: Failed to capture frame manually.");
-      toast({ title: "Gagal Menangkap Gambar", description: "Tidak dapat menangkap gambar dari kamera. Pastikan kamera berfungsi.", variant: "destructive" });
-    }
-  }, [isAiAnalyzing, isCameraActive, cameraFeedRef, handleAnalyzeScene, toast]);
   
-
   const handleSendMessage = useCallback(async (userQuestion: string) => {
     stopSpeaking();
-    
-    const userMessageId = Date.now().toString();
-    // Add user message. It will show currentContextImageUri if available.
-    addMessage({ id: userMessageId, role: 'user', content: userQuestion, image: currentContextImageUri });
-    setIsAiAnalyzing(true); 
+    setIsAiAnalyzing(true);
   
-    if (!currentContextImageUri) { // Check if there's a context image from manual analysis
-      const aiErrorMsg = "Saat ini tidak ada gambar untuk dijadikan konteks pertanyaan Anda. Silakan analisis pemandangan terlebih dahulu menggunakan tombol 'Analisis Pemandangan' (ikon mata).";
-      addMessage({ id: Date.now().toString() + '-ai-no-ctx', role: 'assistant', content: aiErrorMsg, isError: true });
-      speakText(aiErrorMsg);
-      toast({
-        title: "Tidak Ada Konteks Visual",
-        description: aiErrorMsg,
-        variant: "destructive"
-      });
+    if (!isCameraActive || !cameraFeedRef.current) {
+      const errorMsg = "Kamera tidak aktif. Aktifkan kamera untuk bertanya tentang apa yang dilihatnya.";
+      addMessage({ id: Date.now().toString(), role: 'assistant', content: errorMsg, isError: true });
+      speakText(errorMsg);
+      toast({ title: "Kamera Tidak Aktif", description: errorMsg, variant: "destructive" });
       setIsAiAnalyzing(false);
       return;
     }
+  
+    const imageDataUri = cameraFeedRef.current.captureCurrentFrame();
+  
+    if (!imageDataUri) {
+      const errorMsg = "Tidak dapat menangkap gambar dari kamera. Pastikan kamera berfungsi dan berikan izin.";
+      addMessage({ id: Date.now().toString(), role: 'assistant', content: errorMsg, isError: true });
+      speakText(errorMsg);
+      toast({ title: "Gagal Menangkap Gambar", description: errorMsg, variant: "destructive" });
+      setIsAiAnalyzing(false);
+      return;
+    }
+  
+    setCurrentContextImageUri(imageDataUri); // Set image for user message display
+    
+    const userMessageId = Date.now().toString();
+    // Add user message with the captured image
+    addMessage({ id: userMessageId, role: 'user', content: userQuestion, image: imageDataUri });
     
     try {
-      console.log("ChatPanel: Sending user question with current context image to AI.");
-      // Use currentContextImageUri for the AI call
-      const response = await contextualChatWithVision({ photoDataUri: currentContextImageUri, question: userQuestion });
+      console.log("ChatPanel: Sending user question with live camera frame to AI.");
+      const response = await contextualChatWithVision({ photoDataUri: imageDataUri, question: userQuestion });
       addMessage({ id: Date.now().toString(), role: 'assistant', content: response.answer });
       if(response.answer) speakText(response.answer);
     } catch (error) {
       console.error("Error in contextual chat:", error);
       const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui.";
-      const aiErrorMsg = `Maaf, saya mengalami kesalahan saat memproses pertanyaan Anda dengan gambar: ${errorMessage}`;
+      const aiErrorMsg = `Maaf, saya mengalami kesalahan saat memproses pertanyaan Anda dengan gambar: ${errorMessage.substring(0, 150)}...`;
       addMessage({ id: Date.now().toString(), role: 'assistant', content: aiErrorMsg, isError: true });
-      speakText(aiErrorMsg);
+      speakText(`Terjadi kesalahan: ${errorMessage.substring(0,50)}`);
       toast({
         title: "Kesalahan Obrolan AI",
         description: `Gagal mendapatkan respons. ${errorMessage}`,
@@ -180,7 +135,7 @@ const ChatPanel: FC<ChatPanelProps> = ({
       setIsAiAnalyzing(false);
     }
   
-  }, [addMessage, speakText, stopSpeaking, toast, setIsAiAnalyzing, currentContextImageUri]);
+  }, [addMessage, speakText, stopSpeaking, toast, setIsAiAnalyzing, isCameraActive, cameraFeedRef]);
 
   const toggleTts = () => {
     setIsTtsEnabled(prev => {
@@ -205,11 +160,9 @@ const ChatPanel: FC<ChatPanelProps> = ({
         isTtsEnabled={isTtsEnabled}
         onToggleTts={toggleTts}
         stopSpeaking={stopSpeaking}
-        onAnalyzeScene={triggerManualSceneAnalysis} 
       />
     </div>
   );
 };
 
 export default ChatPanel;
-
