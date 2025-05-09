@@ -73,6 +73,13 @@ export default function VisionAIChatPage() {
         </Button>
       </div>
 
+      {/* Watermark */}
+      <div className="fixed top-4 right-4 z-20 text-right pointer-events-none">
+        <h1 className="text-2xl font-bold text-white/80 drop-shadow-md">VisionAI</h1>
+        <p className="text-xs text-white/70 drop-shadow-sm">Farqonzero.dev</p>
+      </div>
+
+
       {/* Modified wrapper for ChatPanel to allow it to fill more screen height */}
       <div className="fixed inset-x-0 top-0 bottom-0 p-2 sm:p-4 z-10 flex flex-col pointer-events-none"> {/* Added pointer-events-none to allow interaction with elements behind if chat panel is mostly transparent */}
         <div className="max-w-2xl mx-auto w-full flex flex-col h-full"> {/* This container allows ChatPanel to use h-full */}
