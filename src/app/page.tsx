@@ -76,7 +76,7 @@ export default function VisionAIChatPage() {
       {/* Watermark */}
       <div className="fixed top-2 right-4 z-20 text-right pointer-events-none">
         <h1 className="text-2xl font-bold text-white/80 drop-shadow-md">VisionAI</h1>
-        <p className="text-xs text-white/70 drop-shadow-sm">Farqonzero.dev</p>
+        <p className="text-xs text-white/70 drop-shadow-sm mt-[-0.15rem]">Farqonzero.dev</p>
       </div>
 
 
