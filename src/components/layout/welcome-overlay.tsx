@@ -15,8 +15,8 @@ const WelcomeOverlay: FC<WelcomeOverlayProps> = ({ onStart }) => {
         <h1 className="text-6xl sm:text-7xl font-bold text-accent mb-4 animate-fade-in-down">
           VisionAI
         </h1>
-        <p className="text-muted-foreground mb-10 text-lg animate-fade-in-up animation-delay-300 max-w-xl px-4">
-          AI yang bisa berinteraksi melalui kamera secara real time yang dikembangkan oleh Farqonzero.def dengan menggunakan model AI/ML Gemini 2.5 flash
+        <p className="text-foreground mb-10 text-lg animate-fade-in-up animation-delay-300 max-w-xl px-4">
+          Saksikan keajaiban interaksi AI visual secara langsung! Ditenagai oleh Gemini 2.5 flash dan dirancang oleh Farqonzero.def, VisionAI membawa Anda lebih dekat dengan dunia melalui lensa kamera.
         </p>
         <Button
           size="lg"
