@@ -70,4 +70,3 @@ const WelcomeOverlay: FC<WelcomeOverlayProps> = ({ onStart }) => {
 };
 
 export default WelcomeOverlay;
-
