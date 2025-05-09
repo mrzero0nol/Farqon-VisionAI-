@@ -7,6 +7,7 @@ import ChatPanel from '@/components/chat/chat-panel';
 import type { CameraFeedRefType } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Eye, EyeOff } from 'lucide-react';
+import WelcomeOverlay from '@/components/layout/welcome-overlay'; // Import WelcomeOverlay
 
 export default function VisionAIChatPage() {
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
@@ -14,6 +15,7 @@ export default function VisionAIChatPage() {
   const [isAiAnalyzing, setIsAiAnalyzing] = useState<boolean>(false); // For AI model processing
   const cameraFeedRef = useRef<CameraFeedRefType>(null);
   const [showChatBubbles, setShowChatBubbles] = useState<boolean>(true);
+  const [showWelcomeOverlay, setShowWelcomeOverlay] = useState<boolean>(true); // State for welcome overlay
 
   useEffect(() => {
     console.log(`Page: isCameraActive: ${isCameraActive}, isCameraProcessing: ${isCameraProcessing}, isAiAnalyzing: ${isAiAnalyzing}`);
@@ -47,6 +49,14 @@ export default function VisionAIChatPage() {
     setShowChatBubbles(prev => !prev);
   }, []);
 
+  const handleStartApp = useCallback(() => {
+    setShowWelcomeOverlay(false);
+  }, []);
+
+
+  if (showWelcomeOverlay) {
+    return <WelcomeOverlay onStart={handleStartApp} />;
+  }
 
   return (
     <div className="relative min-h-screen bg-background font-sans overflow-hidden"> {/* Added overflow-hidden to body container */}
@@ -98,4 +108,3 @@ export default function VisionAIChatPage() {
     </div>
   );
 }
-
