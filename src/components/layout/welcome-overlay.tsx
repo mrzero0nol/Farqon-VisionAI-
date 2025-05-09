@@ -12,7 +12,7 @@ const WelcomeOverlay: FC<WelcomeOverlayProps> = ({ onStart }) => {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm">
       <div className="text-center">
-        <h1 className="text-6xl sm:text-7xl font-bold text-primary mb-4 animate-fade-in-down">
+        <h1 className="text-6xl sm:text-7xl font-bold text-accent mb-4 animate-fade-in-down">
           VisionAI
         </h1>
         <p className="text-muted-foreground mb-10 text-lg animate-fade-in-up animation-delay-300 max-w-xl px-4">
@@ -21,7 +21,7 @@ const WelcomeOverlay: FC<WelcomeOverlayProps> = ({ onStart }) => {
         <Button
           size="lg"
           onClick={onStart}
-          className="animate-fade-in-up animation-delay-600 text-lg px-8 py-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300"
+          className="animate-fade-in-up animation-delay-600 text-lg px-8 py-6 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 bg-accent hover:bg-accent/90 text-accent-foreground"
           aria-label="Mulai Aplikasi VisionAI"
         >
           Mulai
@@ -70,3 +70,4 @@ const WelcomeOverlay: FC<WelcomeOverlayProps> = ({ onStart }) => {
 };
 
 export default WelcomeOverlay;
+
