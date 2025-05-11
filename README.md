@@ -31,27 +31,29 @@ NEXT_PUBLIC_FIREBASE_APP_ID=YOUR_FIREBASE_APP_ID
 NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=YOUR_FIREBASE_MEASUREMENT_ID
 ```
 
-### Google Custom Search API (for Internet Search Feature)
+### Google Custom Search API (for Internet Search Feature) & Genkit Google AI
 
-If you intend to use the internet search functionality provided by the `searchInternetTool`, you will need to set up Google Custom Search API credentials.
+If you intend to use the internet search functionality provided by the `searchInternetTool` or Genkit's Google AI capabilities (like Gemini models), you will need a Google API Key. For the search tool, you also need a Custom Search Engine ID.
 
-1.  **Enable the Custom Search API** in your Google Cloud Console project.
-2.  **Get an API Key**.
-3.  **Create a Custom Search Engine** and get its ID (CX). You can configure it to search the entire web.
+1.  **Enable necessary APIs** in your Google Cloud Console project (e.g., Custom Search API, Generative Language API / Vertex AI API).
+2.  **Get a Google API Key**. This key will be used for both Genkit's Google AI models and the Custom Search API.
+3.  **Create a Custom Search Engine** and get its ID (CX) if using the `searchInternetTool`. You can configure it to search the entire web.
 
-More details can be found here: [Google Custom Search API Overview](https://developers.google.com/custom-search/v1/overview)
+More details can be found here:
+*   [Google Custom Search API Overview](https://developers.google.com/custom-search/v1/overview)
+*   [Google AI Gemini API Documentation](https://ai.google.dev/docs)
 
-Once you have your API Key and Search Engine ID, add them to your `.env` file for local development:
+Once you have your API Key and (if applicable) Search Engine ID, add them to your `.env` file for local development:
 ```env
 GOOGLE_API_KEY=YOUR_GOOGLE_API_KEY
 GOOGLE_CSE_ID=YOUR_GOOGLE_CUSTOM_SEARCH_ENGINE_ID
 ```
 
-Replace `YOUR_GOOGLE_API_KEY` with your actual Google API Key and `YOUR_GOOGLE_CUSTOM_SEARCH_ENGINE_ID` with your Custom Search Engine ID.
+Replace `YOUR_GOOGLE_API_KEY` with your actual Google API Key and `YOUR_GOOGLE_CUSTOM_SEARCH_ENGINE_ID` with your Custom Search Engine ID. The `GOOGLE_API_KEY` is used by Genkit for Google AI models, and both are used by the `searchInternetTool`.
 
 ## API Quotas and Rate Limiting
 
-This application uses Google's Generative AI models (like Gemini) via Genkit. These APIs have usage quotas and rate limits to ensure fair usage and prevent abuse.
+This application uses Google's Generative AI models (like Gemini) via Genkit and potentially the Google Custom Search API. These APIs have usage quotas and rate limits to ensure fair usage and prevent abuse.
 
 If you encounter errors like "429 Too Many Requests", "Resource has been exhausted", or similar quota-related messages, it means your application has exceeded the number of allowed requests to the API within a specific time period.
 
@@ -60,7 +62,9 @@ If you encounter errors like "429 Too Many Requests", "Resource has been exhaust
 1.  Go to the [Google Cloud Console](https://console.cloud.google.com/).
 2.  Select your project.
 3.  Navigate to "IAM & Admin" > "Quotas".
-4.  Filter for the "Generative Language API" (or the specific API used by the Gemini model, e.g., "Vertex AI API" if using Vertex AI endpoints).
+4.  Filter for the relevant APIs:
+    *   "Generative Language API" (or the specific API used by the Gemini model, e.g., "Vertex AI API" if using Vertex AI endpoints).
+    *   "Custom Search API" if you are using the internet search tool.
 5.  Review your current usage and limits. Common quotas include requests per minute.
 
 ### Requesting a Quota Increase
@@ -184,7 +188,7 @@ Cloudflare Pages offers first-class support for Next.js.
     *   **Build command:** This should typically be `npm run build` or `next build`.
     *   **Build output directory:** For Next.js with App Router, Cloudflare's Next.js preset usually handles this correctly (it's not just a static `out` folder unless you've configured `output: 'export'` in `next.config.js`).
 7.  **Set Environment Variables:**
-    *   In the "Environment variables (advanced)" section of your Cloudflare Pages project settings, add all the necessary environment variables:
+    *   In the "Environment variables (advanced)" section of your Cloudflare Pages project settings (under "Settings" -> "Environment variables"), add all the necessary environment variables for both "Production" and "Preview" environments if needed:
         *   `NEXT_PUBLIC_FIREBASE_API_KEY`
         *   `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
         *   `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
@@ -192,9 +196,12 @@ Cloudflare Pages offers first-class support for Next.js.
         *   `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
         *   `NEXT_PUBLIC_FIREBASE_APP_ID`
         *   `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` (if used)
-        *   `GOOGLE_API_KEY`
-        *   `GOOGLE_CSE_ID`
-    *   **Important:** Ensure you differentiate between "Build environment variables" (available during build) and "Production/Preview environment variables" (available at runtime). `NEXT_PUBLIC_` variables need to be available at build time to be bundled for the client. Server-side variables like `GOOGLE_API_KEY` are needed at runtime. Cloudflare's Next.js adapter usually handles this distinction well.
+        *   `GOOGLE_API_KEY` (Crucial for Genkit Google AI models and Google Custom Search)
+        *   `GOOGLE_CSE_ID` (Crucial for Google Custom Search tool)
+    *   **Important:**
+        *   `NEXT_PUBLIC_` prefixed variables are generally made available to the client-side during the Next.js build process.
+        *   Server-side variables like `GOOGLE_API_KEY` and `GOOGLE_CSE_ID` are used by Genkit flows and tools running on the server (or serverless functions).
+        *   Cloudflare's Next.js adapter (`@cloudflare/next-on-pages`) usually handles making these environment variables available correctly to your Next.js application functions at runtime and client-side variables at build time. Ensure you set them in the Cloudflare Pages dashboard for your project.
 8.  **Deploy:** Save and Deploy. Cloudflare will build and deploy your site.
 9.  **Custom Domain:** After deployment, you can add your custom Cloudflare domain in the "Custom domains" tab of your Pages project settings.
 
