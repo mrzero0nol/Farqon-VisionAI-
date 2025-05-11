@@ -89,7 +89,7 @@ Tugas Utama Anda:
 
 Instruksi Khusus untuk Menghitung Objek:
 Jika pertanyaan pengguna secara eksplisit meminta untuk menghitung objek (misalnya, "hitung jumlah X", "ada berapa Y di gambar ini?", "lingkari dan hitung semua Z yang terlihat", "identifikasi dan hitung benda-benda di gambar ini", "berapa banyak objek ini"), maka Anda HARUS:
-1.  Memastikan ada gambar yang disediakan melalui photoDataUri. Jika tidak ada, jelaskan bahwa Anda memerlukan gambar untuk menghitung.
+1.  Memastikan ada gambar yang disediakan melalui \`photoDataUri\`. Jika tidak ada, jelaskan bahwa Anda memerlukan gambar untuk menghitung.
 2.  Menganalisis gambar yang diberikan dengan cermat.
 3.  Identifikasi objek-objek yang berbeda dalam gambar sesuai permintaan pengguna.
 4.  Untuk setiap JENIS objek yang Anda temukan dan relevan dengan permintaan:
@@ -135,15 +135,29 @@ const contextualChatWithVisionFlow = ai.defineFlow(
     inputSchema: ContextualChatWithVisionInputSchema,
     outputSchema: ContextualChatWithVisionOutputSchema,
   },
-  async input => {
+  async (input): Promise<ContextualChatWithVisionOutput> => {
     console.log('[contextualChatWithVisionFlow] Input received:', input.question, 'Image present:', !!input.photoDataUri);
-    const {output} = await prompt(input);
-    if (!output) {
-      console.error('[contextualChatWithVisionFlow] Prompt did not return an output.');
-      return { answer: "Maaf, saya tidak dapat menghasilkan respons saat ini." };
+    try {
+      const {output} = await prompt(input);
+      if (!output) {
+        console.error('[contextualChatWithVisionFlow] Prompt did not return an output.');
+        return { answer: "Maaf, saya tidak dapat menghasilkan respons saat ini karena output dari AI kosong.", countedObjects: undefined };
+      }
+      console.log('[contextualChatWithVisionFlow] Output generated. Answer:', output.answer, 'Counted Objects:', output.countedObjects ? output.countedObjects.length : 'None');
+      return output;
+    } catch (error: any) {
+      console.error('[contextualChatWithVisionFlow] Error during AI processing:', error);
+      let errorMessageForUser = "Terjadi kesalahan internal saat memproses permintaan Anda.";
+      
+      if (error.message && (error.message.includes('429') || error.message.toLowerCase().includes('too many requests') || error.message.toLowerCase().includes('resource has been exhausted'))) {
+        errorMessageForUser = "Error: Batas penggunaan API telah tercapai. Silakan coba lagi nanti atau periksa kuota API Anda di Google Cloud Console.";
+        console.warn('[contextualChatWithVisionFlow] Encountered 429 Too Many Requests error.');
+      } else if (error.message) {
+        errorMessageForUser = `Error: Terjadi masalah saat menghubungi AI. (${error.message.substring(0, 100)}${error.message.length > 100 ? '...' : ''})`;
+      }
+      
+      return { answer: errorMessageForUser, countedObjects: undefined };
     }
-    console.log('[contextualChatWithVisionFlow] Output generated. Answer:', output.answer, 'Counted Objects:', output.countedObjects ? output.countedObjects.length : 'None');
-    return output;
   }
 );
 
