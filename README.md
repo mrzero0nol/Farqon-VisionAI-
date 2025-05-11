@@ -45,8 +45,8 @@ More details can be found here:
 
 Once you have your API Key and (if applicable) Search Engine ID, add them to your `.env` file for local development:
 ```env
-GOOGLE_API_KEY=YOUR_GOOGLE_API_KEY
-GOOGLE_CSE_ID=YOUR_GOOGLE_CUSTOM_SEARCH_ENGINE_ID
+GOOGLE_API_KEY=AIzaSyC_AjAWxv8ez_mE9ErqsQs-T2RnZzDQdT8
+GOOGLE_CSE_ID=d2bfcc569e7c94c95
 ```
 
 Replace `YOUR_GOOGLE_API_KEY` with your actual Google API Key and `YOUR_GOOGLE_CUSTOM_SEARCH_ENGINE_ID` with your Custom Search Engine ID. The `GOOGLE_API_KEY` is used by Genkit for Google AI models, and both are used by the `searchInternetTool`.
@@ -128,14 +128,14 @@ If you consistently hit your quota limits and require higher throughput, you can
      ```json
     {
       "hosting": {
-        "source": ".", // Tells Firebase to look for Next.js output from `next build`
+        "source": ".", 
         "ignore": [
           "firebase.json",
           "**/.*",
           "**/node_modules/**"
         ],
         "frameworksBackend": {
-          "region": "us-central1" // Or your preferred region
+          "region": "us-central1" 
         }
       }
     }
@@ -162,15 +162,15 @@ If you consistently hit your quota limits and require higher throughput, you can
     Since `.env` files are not deployed, you need to set your environment variables (like Firebase API keys and Google Search API keys) in the Firebase environment. For Cloud Functions for Firebase (which Next.js integrations often use as a backend when `frameworksBackend` is used):
     ```bash
     firebase functions:config:set \
-    NEXT_PUBLIC_FIREBASE_API_KEY="YOUR_FIREBASE_API_KEY" \
-    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="YOUR_FIREBASE_AUTH_DOMAIN" \
-    NEXT_PUBLIC_FIREBASE_PROJECT_ID="YOUR_FIREBASE_PROJECT_ID" \
-    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="YOUR_FIREBASE_STORAGE_BUCKET" \
-    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="YOUR_FIREBASE_MESSAGING_SENDER_ID" \
-    NEXT_PUBLIC_FIREBASE_APP_ID="YOUR_FIREBASE_APP_ID" \
-    NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID="YOUR_FIREBASE_MEASUREMENT_ID" \
-    GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY" \
-    GOOGLE_CSE_ID="YOUR_GOOGLE_CSE_ID"
+    NEXT_PUBLIC_FIREBASE_API_KEY="AIzaSyBiU4cHaWta9JpwWr7wd3oN-UnNlwSD5M8" \
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="farqon-visionai.firebaseapp.com" \
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID="farqon-visionai" \
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="farqon-visionai.firebasestorage.app" \
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="834196735834" \
+    NEXT_PUBLIC_FIREBASE_APP_ID="1:834196735834:web:69d9b9e3a0386222c7d563" \
+    NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID="G-NL64P3Z2Q3" \
+    GOOGLE_API_KEY="AIzaSyC_AjAWxv8ez_mE9ErqsQs-T2RnZzDQdT8" \
+    GOOGLE_CSE_ID="d2bfcc569e7c94c95"
     ```
     Note: `NEXT_PUBLIC_` variables are made available client-side during the build process. Server-side only variables (like `GOOGLE_API_KEY`) need to be handled appropriately. With `frameworksBackend`, Firebase attempts to manage this. Refer to the latest Firebase documentation for deploying Next.js apps. For purely static exports, environment variables used at build time (like `NEXT_PUBLIC_`) are baked into the static files. Runtime server-side variables are not applicable for static exports.
 
@@ -189,15 +189,15 @@ Cloudflare Pages offers first-class support for Next.js.
     *   **Build output directory:** For Next.js with App Router, Cloudflare's Next.js preset usually handles this correctly (it's not just a static `out` folder unless you've configured `output: 'export'` in `next.config.js`).
 7.  **Set Environment Variables:**
     *   In the "Environment variables (advanced)" section of your Cloudflare Pages project settings (under "Settings" -> "Environment variables"), add all the necessary environment variables for both "Production" and "Preview" environments if needed:
-        *   `NEXT_PUBLIC_FIREBASE_API_KEY`
-        *   `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-        *   `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-        *   `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
-        *   `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-        *   `NEXT_PUBLIC_FIREBASE_APP_ID`
-        *   `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` (if used)
-        *   `GOOGLE_API_KEY` (Crucial for Genkit Google AI models and Google Custom Search)
-        *   `GOOGLE_CSE_ID` (Crucial for Google Custom Search tool)
+        *   `NEXT_PUBLIC_FIREBASE_API_KEY="AIzaSyBiU4cHaWta9JpwWr7wd3oN-UnNlwSD5M8"`
+        *   `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="farqon-visionai.firebaseapp.com"`
+        *   `NEXT_PUBLIC_FIREBASE_PROJECT_ID="farqon-visionai"`
+        *   `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="farqon-visionai.firebasestorage.app"`
+        *   `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="834196735834"`
+        *   `NEXT_PUBLIC_FIREBASE_APP_ID="1:834196735834:web:69d9b9e3a0386222c7d563"`
+        *   `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID="G-NL64P3Z2Q3"`
+        *   `GOOGLE_API_KEY="AIzaSyC_AjAWxv8ez_mE9ErqsQs-T2RnZzDQdT8"` (Crucial for Genkit Google AI models and Google Custom Search)
+        *   `GOOGLE_CSE_ID="d2bfcc569e7c94c95"` (Crucial for Google Custom Search tool)
     *   **Important:**
         *   `NEXT_PUBLIC_` prefixed variables are generally made available to the client-side during the Next.js build process.
         *   Server-side variables like `GOOGLE_API_KEY` and `GOOGLE_CSE_ID` are used by Genkit flows and tools running on the server (or serverless functions).
