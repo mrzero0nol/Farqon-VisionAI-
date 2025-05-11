@@ -187,6 +187,7 @@ Cloudflare Pages offers first-class support for Next.js.
     *   **Framework preset:** Select **Next.js**. Cloudflare should automatically detect and configure most settings.
     *   **Build command:** This should typically be `npm run build` or `next build`.
     *   **Build output directory:** For Next.js with App Router, Cloudflare's Next.js preset usually handles this correctly (it's not just a static `out` folder unless you've configured `output: 'export'` in `next.config.js`).
+    *   **Routing and `firebase.json`:** Note that the `firebase.json` file is specific to Firebase Hosting. Cloudflare Pages uses its own built-in support and the `@cloudflare/next-on-pages` build utility to handle routing for Next.js applications. You do not need to configure `firebase.json` for Cloudflare Pages. Any custom routing or redirect logic (beyond what Next.js handles inherently) would typically be managed via a `_redirects` file in your project root for Cloudflare Pages.
 7.  **Set Environment Variables:**
     *   In the "Environment variables (advanced)" section of your Cloudflare Pages project settings (under "Settings" -> "Environment variables"), add all the necessary environment variables for both "Production" and "Preview" environments if needed:
         *   `NEXT_PUBLIC_FIREBASE_API_KEY="AIzaSyBiU4cHaWta9JpwWr7wd3oN-UnNlwSD5M8"`
