@@ -9,7 +9,7 @@ To get started, take a look at src/app/page.tsx.
 
 Create a `.env` file in the root of your project for local development. This file is used to store environment-specific configurations.
 
-**Important:** When deploying to a hosting service (like Firebase Hosting or Cloudflare Pages), you will need to configure these environment variables directly in the hosting provider's settings dashboard. Do not commit your `.env` file to version control.
+**Important:** When deploying to a hosting service (like Netlify), you will need to configure these environment variables directly in the hosting provider's settings dashboard. Do not commit your `.env` file to version control.
 
 ### Firebase Configuration (for Authentication & other Firebase services)
 
@@ -49,7 +49,7 @@ GOOGLE_API_KEY=AIzaSyC_AjAWxv8ez_mE9ErqsQs-T2RnZzDQdT8
 GOOGLE_CSE_ID=d2bfcc569e7c94c95
 ```
 
-Replace `YOUR_GOOGLE_API_KEY` with your actual Google API Key and `YOUR_GOOGLE_CUSTOM_SEARCH_ENGINE_ID` with your Custom Search Engine ID. The `GOOGLE_API_KEY` is used by Genkit for Google AI models, and both are used by the `searchInternetTool`.
+Replace `AIzaSyC_AjAWxv8ez_mE9ErqsQs-T2RnZzDQdT8` with your actual Google API Key and `d2bfcc569e7c94c95` with your Custom Search Engine ID. The `GOOGLE_API_KEY` is used by Genkit for Google AI models, and both are used by the `searchInternetTool`.
 
 ## API Quotas and Rate Limiting
 
@@ -84,112 +84,26 @@ If you consistently hit your quota limits and require higher throughput, you can
 
 ## Deployment
 
-### Deploying to Firebase Hosting
+### Deploying to Netlify
 
-1.  **Install Firebase CLI:** If you haven't already, install the Firebase CLI:
-    ```bash
-    npm install -g firebase-tools
-    ```
-2.  **Login to Firebase:**
-    ```bash
-    firebase login
-    ```
-3.  **Initialize Firebase in your project:**
-    ```bash
-    firebase init hosting
-    ```
-    *   Select "Use an existing project" and choose your Firebase project.
-    *   Set your public directory to `out`. (For Next.js 13+ with App Router, Firebase Hosting will often detect Next.js and configure this correctly. If asked for "public directory", ensure it points to the correct Next.js output, or follow Firebase's specific Next.js deployment guides.)
-    *   Configure as a single-page app (SPA): **No** (Next.js handles routing).
-    *   Set up automatic builds and deploys with GitHub: Optional, you can set this up.
-    *   File `public/index.html` already exists. Overwrite? **No** (if you have a custom one, otherwise Firebase might generate one).
+Netlify offers excellent support for Next.js applications.
 
-4.  **Configure Rewrites for Next.js (in `firebase.json`):**
-    Firebase needs to know how to serve your Next.js app. Your `firebase.json` should look something like this for hosting a static Next.js export:
-    ```json
-    {
-      "hosting": {
-        "public": "out",
-        "ignore": [
-          "firebase.json",
-          "**/.*",
-          "**/node_modules/**"
-        ],
-        "rewrites": [
-          {
-            "source": "**",
-            "destination": "/index.html"
-          }
-        ]
-      }
-    }
-    ```
-    For dynamic Next.js applications using App Router or Pages Router with server-side capabilities, Firebase Hosting typically integrates with Cloud Functions for Firebase or Cloud Run. The `firebase.json` would look more like:
-     ```json
-    {
-      "hosting": {
-        "source": ".", 
-        "ignore": [
-          "firebase.json",
-          "**/.*",
-          "**/node_modules/**"
-        ],
-        "frameworksBackend": {
-          "region": "us-central1" 
-        }
-      }
-    }
-    ```
-    Firebase CLI's `init hosting` with Next.js detection should handle this for you by setting `frameworksBackend`. If you are aiming for a fully static export (`output: 'export'` in `next.config.js`), then the `public: "out"` and rewrites approach is used. Otherwise, `frameworksBackend` is preferred for full Next.js features.
-
-5.  **Build your Next.js app:**
-    If you are using `output: 'export'` in `next.config.js`:
-    ```bash
-    npm run build 
-    ```
-    This will typically create an `out` directory.
-    If you are using the `frameworksBackend` approach (default for full Next.js features):
-    ```bash
-    npm run build
-    ```
-    This will create a `.next` directory that Firebase will use.
-
-6.  **Deploy to Firebase Hosting:**
-    ```bash
-    firebase deploy --only hosting
-    ```
-7.  **Set Environment Variables in Firebase:**
-    Since `.env` files are not deployed, you need to set your environment variables (like Firebase API keys and Google Search API keys) in the Firebase environment. For Cloud Functions for Firebase (which Next.js integrations often use as a backend when `frameworksBackend` is used):
-    ```bash
-    firebase functions:config:set \
-    NEXT_PUBLIC_FIREBASE_API_KEY="AIzaSyBiU4cHaWta9JpwWr7wd3oN-UnNlwSD5M8" \
-    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="farqon-visionai.firebaseapp.com" \
-    NEXT_PUBLIC_FIREBASE_PROJECT_ID="farqon-visionai" \
-    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="farqon-visionai.firebasestorage.app" \
-    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="834196735834" \
-    NEXT_PUBLIC_FIREBASE_APP_ID="1:834196735834:web:69d9b9e3a0386222c7d563" \
-    NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID="G-NL64P3Z2Q3" \
-    GOOGLE_API_KEY="AIzaSyC_AjAWxv8ez_mE9ErqsQs-T2RnZzDQdT8" \
-    GOOGLE_CSE_ID="d2bfcc569e7c94c95"
-    ```
-    Note: `NEXT_PUBLIC_` variables are made available client-side during the build process. Server-side only variables (like `GOOGLE_API_KEY`) need to be handled appropriately. With `frameworksBackend`, Firebase attempts to manage this. Refer to the latest Firebase documentation for deploying Next.js apps. For purely static exports, environment variables used at build time (like `NEXT_PUBLIC_`) are baked into the static files. Runtime server-side variables are not applicable for static exports.
-
-### Deploying to Cloudflare Pages
-
-Cloudflare Pages offers first-class support for Next.js.
-
-1.  **Push your code to a Git repository** (GitHub, GitLab).
-2.  **Go to your Cloudflare dashboard.**
-3.  Navigate to **Workers & Pages** and click **Create application**.
-4.  Select **Pages** and connect your Git provider.
-5.  **Select your repository.**
-6.  **Configure your build settings:**
-    *   **Framework preset:** Select **Next.js**. Cloudflare should automatically detect and configure most settings.
-    *   **Build command:** This should typically be `npm run build` or `next build`.
-    *   **Build output directory:** For Next.js with App Router, Cloudflare's Next.js preset usually handles this correctly (it's not just a static `out` folder unless you've configured `output: 'export'` in `next.config.js`).
-    *   **Routing and `firebase.json`:** Note that the `firebase.json` file is specific to Firebase Hosting. Cloudflare Pages uses its own built-in support and the `@cloudflare/next-on-pages` build utility to handle routing for Next.js applications. You do not need to configure `firebase.json` for Cloudflare Pages. Any custom routing or redirect logic (beyond what Next.js handles inherently) would typically be managed via a `_redirects` file in your project root for Cloudflare Pages.
+1.  **Push your code to a Git repository** (e.g., GitHub, GitLab, Bitbucket).
+2.  **Sign up or Log in to Netlify:** Go to [netlify.com](https://www.netlify.com/).
+3.  **Create a New Site:**
+    *   From your Netlify dashboard, click "Add new site" (or "New site from Git").
+    *   Choose "Import an existing project".
+4.  **Connect to Your Git Provider:** Select your Git provider and authorize Netlify.
+5.  **Select Your Repository:** Choose the repository for this project.
+6.  **Configure Build Settings:**
+    *   Netlify will usually auto-detect that it's a Next.js project and configure build settings correctly using the `@netlify/plugin-nextjs`.
+    *   **Build command:** Should default to `npm run build` or `next build`.
+    *   **Publish directory:** Should default to `.next`.
+    *   Ensure the `@netlify/plugin-nextjs` is active. If Netlify doesn't add it automatically, you might need to add a `netlify.toml` file (see below).
 7.  **Set Environment Variables:**
-    *   In the "Environment variables (advanced)" section of your Cloudflare Pages project settings (under "Settings" -> "Environment variables"), add all the necessary environment variables for both "Production" and "Preview" environments if needed:
+    *   Before deploying (or after the first deploy), go to your site's settings on Netlify.
+    *   Navigate to "Site configuration" > "Build & deploy" > "Environment".
+    *   Click "Edit variables" and add the following, ensuring you use your actual values:
         *   `NEXT_PUBLIC_FIREBASE_API_KEY="AIzaSyBiU4cHaWta9JpwWr7wd3oN-UnNlwSD5M8"`
         *   `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="farqon-visionai.firebaseapp.com"`
         *   `NEXT_PUBLIC_FIREBASE_PROJECT_ID="farqon-visionai"`
@@ -199,12 +113,23 @@ Cloudflare Pages offers first-class support for Next.js.
         *   `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID="G-NL64P3Z2Q3"`
         *   `GOOGLE_API_KEY="AIzaSyC_AjAWxv8ez_mE9ErqsQs-T2RnZzDQdT8"` (Crucial for Genkit Google AI models and Google Custom Search)
         *   `GOOGLE_CSE_ID="d2bfcc569e7c94c95"` (Crucial for Google Custom Search tool)
-    *   **Important:**
-        *   `NEXT_PUBLIC_` prefixed variables are generally made available to the client-side during the Next.js build process.
-        *   Server-side variables like `GOOGLE_API_KEY` and `GOOGLE_CSE_ID` are used by Genkit flows and tools running on the server (or serverless functions).
-        *   Cloudflare's Next.js adapter (`@cloudflare/next-on-pages`) usually handles making these environment variables available correctly to your Next.js application functions at runtime and client-side variables at build time. Ensure you set them in the Cloudflare Pages dashboard for your project.
-8.  **Deploy:** Save and Deploy. Cloudflare will build and deploy your site.
-9.  **Custom Domain:** After deployment, you can add your custom Cloudflare domain in the "Custom domains" tab of your Pages project settings.
+    *   `NEXT_PUBLIC_` prefixed variables are made available client-side. Server-side variables like `GOOGLE_API_KEY` are also handled correctly by Netlify for your Next.js functions.
+8.  **Deploy Site:** Click "Deploy site" (or "Trigger deploy" if settings were changed after initial setup). Netlify will build and deploy your application.
+9.  **Custom Domain (Optional):** After deployment, you can set up a custom domain in your site's "Domain management" settings on Netlify.
+
+### `netlify.toml` (Optional, but recommended for explicit configuration)
+
+While Netlify often auto-detects Next.js, you can create a `netlify.toml` file in the root of your project for more explicit control:
+
+```toml
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+```
+This ensures Netlify uses the correct build command, output directory, and the essential Next.js plugin for features like server-side rendering, API routes, and image optimization.
 
 **Note:** An `.env.example` file can be provided in the repository as a template. Remember to keep your actual `.env` file out of version control.
 ```

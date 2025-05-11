@@ -1,0 +1,16 @@
+# Netlify configuration file for Next.js projects
+
+[build]
+  # Command to build the Next.js application
+  command = "npm run build"
+  
+  # Directory where the built Next.js application output is located.
+  # For standard Next.js (App Router or Pages Router with SSR/ISR), this is usually ".next".
+  # If you are using `output: 'export'` in next.config.js, this would be "out".
+  publish = ".next"
+
+# The Netlify Plugin for Next.js is essential for full Next.js feature support
+# like server-side rendering, API routes, image optimization, etc.
+# Netlify usually installs this automatically, but explicitly stating it is good practice.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
